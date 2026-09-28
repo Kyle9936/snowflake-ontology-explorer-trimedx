@@ -1,64 +1,67 @@
-# Snowflake Ontology Explorer
+# MMD Ontology Explorer (TriMedx)
 
-Deploy an **Ontology-on-Snowflake knowledge graph** into your own account, then **visualize and explore it** in a local web app. The repo ships everything you need end to end: synthetic (deliberately messy) healthcare data across three source systems, the SQL that builds a full ontology layer on top of it, and a React + Express app that renders the ontology as a graph and lets you chat with a Cortex Agent over it.
+Deploy an **Ontology-on-Snowflake knowledge graph** for medical device fleet management into your own account, then **visualize and explore it** in a local web app. The repo ships everything end to end: synthetic (deliberately messy) device data across three source systems, the SQL that builds a full ontology layer on top of it, and a React + Express app that renders the ontology as a graph and lets you chat with a Cortex Agent over it.
 
-![The Ontology Explorer app: the ontology rendered as a class graph, with an Inspector showing a class's properties, relationships, and cross-system source mappings](assets/images/ontology.png)
-
-> **Internal Snowflake enablement asset** — synthetic data only, not for external distribution. To re-skin it for another industry, see [ADAPTING.md](ADAPTING.md).
+> **Forked from [sfc-gh-ccaudill/snowflake-ontology-explorer](https://github.com/sfc-gh-ccaudill/snowflake-ontology-explorer)** and re-skinned for the TriMedx MMD (Make, Model, Description) use case. The original healthcare demo's architecture, framework, and patterns are preserved - only the domain data, ontology classes, and UI copy have been replaced.
 
 ## What this is / when to use it
 
 Use this repo to:
-- **Explain and demo ontologies to customers** — show, on real messy data, why a naive `table = class` mapping fails and how an ontology resolves the same entity across systems.
-- **Stand up a working ontology + Cortex Agent fast** — one command builds the graph, semantic views, and agents.
-- **Explore an ontology visually** — the web app renders the class graph, the resolved instance graph, and each class's cross-system source mappings.
-- **Adapt it to your own vertical** — the healthcare data is just a worked example; see [ADAPTING.md](ADAPTING.md).
+- **Demo MMD device matching to TriMedx** - show, on realistic messy data, why manufacturer aliases and model number inconsistencies break naive matching and how an ontology resolves them.
+- **Stand up a working ontology + Cortex Agent fast** - one command builds the graph, semantic views, and agents.
+- **Explore an ontology visually** - the web app renders the class graph, the resolved instance graph, and each class's cross-system source mappings.
+- **Show the before/after** - toggle between the ontology agent (full resolution) and the baseline agent (raw tables) to demonstrate the accuracy difference.
+
+## The MMD problem
+
+When TriMedx takes over management of a new hospital site, the sales team needs to price the cost of managing the site's entire medical device fleet. Every device on the incoming inventory must be matched to a known Make, Model, and Description (MMD) record. That MMD record links the device to its parts replacement costs, maintenance schedules, failure rates, and service labor estimates - all of which drive the quote.
+
+The challenge: the same device appears differently across sources.
+
+| Source | Example (same device) |
+|--------|----------------------|
+| FDA GUDID registry | "GE Healthcare" / "CARESCAPE Monitor B650" / "B650 v2" |
+| TriMedx master catalog | "GE" / "B650" / "Bedside patient monitor" |
+| Site inventory | "GE B650" or "G.E. Carescape B650" or "Gen Electric B650" |
+
+Without an ontology, matching is largely manual (~20% auto-match in TriMedx's current process). Wrong match = wrong price = the quote is off by thousands of dollars per device across hundreds of devices.
 
 ## Prerequisites
 
 - A Snowflake account in a **Cortex-enabled region** (the semantic views + agent use Cortex Analyst).
 - A role that can `CREATE DATABASE` (e.g. `SYSADMIN`) and a warehouse (e.g. `COMPUTE_WH`).
-- **Snowflake CLI** (`snow`) with a connection in `~/.snowflake/connections.toml`. Check what you have with `snow connection list`. The deploy defaults to a connection named `DEMO` — if yours is named something else (it usually is), point `SNOWFLAKE_CONNECTION` at it in `config.env` (see below).
+- **Snowflake CLI** (`snow`) with a connection in `~/.snowflake/connections.toml`. Check with `snow connection list`. The deploy defaults to a connection named `DEMO` - override with `SNOWFLAKE_CONNECTION` in `config.env`.
 - For the web app only: **Node 18+** and a **key-pair** connection (the browser cannot sign JWTs).
 
 ## Deploy the data + ontology
 
-> **Using Cortex Code?** Just open this repo in CoCo and ask it to deploy — the root [`COCO.md`](COCO.md) tells it the connection-first deploy flow, subcommands, and guardrails. The manual steps below are the same thing by hand.
-
 ```bash
-# Copy the config and set SNOWFLAKE_CONNECTION to your connection (db names are optional).
-cp config.env.example config.env      # then edit — at minimum, set SNOWFLAKE_CONNECTION
+# Copy the config and set SNOWFLAKE_CONNECTION to your connection.
+cp config.env.example config.env      # then edit - at minimum, set SNOWFLAKE_CONNECTION
 
-./deploy.sh                 # load data -> build ontology -> verify, via `snow`
+./deploy.sh                 # load data -> build ontology -> verify
 ./deploy.sh render          # only render SQL into ./build (to paste into a worksheet)
-./deploy.sh verify          # run the count assertions against your deployment
+./deploy.sh verify          # run count assertions against your deployment
 ./deploy.sh teardown        # DROP the demo databases (asks to confirm)
-./deploy.sh check           # prove render-with-defaults == source (no account needed)
 ```
 
-`./deploy.sh` loads the three source systems ([`sql/data/`](sql/data/)) and then builds the ontology stack ([`sql/ontology/`](sql/ontology/)). Everything is parameterized through `config.env` — no code edits needed to rename:
+`./deploy.sh` loads the three source systems ([`sql/data/`](sql/data/)) and then builds the ontology stack ([`sql/ontology/`](sql/ontology/)). Everything is parameterized through `config.env`:
 
-| Variable | Default | Names |
-|----------|---------|-------|
-| `SNOWFLAKE_CONNECTION` | `DEMO` | which `connections.toml` entry to deploy with — **set this to your own connection name** |
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SNOWFLAKE_CONNECTION` | `DEMO` | which `connections.toml` entry to deploy with |
 | `BUILD_ROLE` / `WAREHOUSE` | `SYSADMIN` / `COMPUTE_WH` | role + warehouse for the build |
-| `EMR_DB` / `EMR_SCHEMA` | `CLINICAL_EMR` / `EHR` | clinical EMR source |
-| `CLAIMS_DB` / `CLAIMS_SCHEMA` | `PAYER_CLAIMS` / `CLAIMS` | payer claims source |
-| `RX_DB` / `RX_SCHEMA` | `PHARMACY_OPS` / `RX` | pharmacy source |
+| `EMR_DB` / `EMR_SCHEMA` | `FDA_DEVICES` / `GUDID` | FDA device registry source |
+| `CLAIMS_DB` / `CLAIMS_SCHEMA` | `TRIMEDX_MMD` / `MASTER` | TriMedx master MMD catalog |
+| `RX_DB` / `RX_SCHEMA` | `SITE_INVENTORY` / `RAW` | incoming site inventory |
 | `ONTOLOGY_DB` / `ONTOLOGY_SCHEMA` | `=EMR_DB` / `ONTOLOGY` | where the ontology is built |
-
-The database-name defaults reproduce the reference build exactly, so the only value most people need to change is `SNOWFLAKE_CONNECTION`. The web app reads the same names (via `server/.env`).
 
 ## Explore it in the web app
 
 [`ontology-explorer/`](ontology-explorer/) is a local React + Express app that:
-- **visualizes the ontology as a network graph** (both the class model and the resolved instance graph),
-- **inspects each class's cross-system source mappings** with live sample rows, and
-- **chats with a Cortex Agent** over the ontology (with a baseline agent to compare against).
-
-![Source Data view: the three raw source systems side by side, with the cross-system key legend and each table's decomposition into ontology classes](assets/images/data.png)
-
-![Ontology metadata view: the self-describing tables that define classes, relationships, and identity-resolution rules](assets/images/ont_metadata.png)
+- **Visualizes the ontology as a network graph** (both the class model and the resolved instance graph)
+- **Inspects each class's cross-system source mappings** with live sample rows
+- **Chats with a Cortex Agent** over the ontology (with a baseline agent toggle for comparison)
 
 ```bash
 cd ontology-explorer
@@ -66,73 +69,86 @@ npm install && npm run install:all
 npm run dev                 # backend :3001 + frontend :5173 -> open http://localhost:5173
 ```
 
-It authenticates with the connection from `~/.snowflake/connections.toml` (defaults to `DEMO`, override with `SNOWFLAKE_CONNECTION_NAME`). To wire chat to the agent you deployed, set `CORTEX_AGENT_NAME`. See the [app README](ontology-explorer/README.md) for full configuration.
+Configure the backend with `server/.env`:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SNOWFLAKE_CONNECTION_NAME` | `DEMO` | connection from `connections.toml` (needs key-pair auth) |
+| `CORTEX_AGENT_NAME` | _(unset)_ | set to `FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_AGENT` to enable live chat |
 
 ## Why an ontology? (the payoff)
 
-Once the data is aligned, the ontology exposes one connected graph you can traverse:
+The ontology resolves device identity across all three source systems into one connected graph:
 
 ```
-Patient ──has coverage──> Coverage (Plan)
+Device ──made_by──> Manufacturer
    │
-   ├── subject of ──> Encounter ──performed by──> Practitioner ──at──> Location
-   │                     └── has ──> Condition (diagnosis)
-   │                     └── has ──> Observation (vitals / labs)
+   ├── belongs_to_family ──> DeviceFamily ──has_pm_schedule──> MaintenanceSchedule
    │
-   ├── subject of ──> Claim / ClaimLine ──> Procedure + Diagnosis + Coverage
+   ├── has_fda_record ──> FDARecord
    │
-   └── subject of ──> MedicationRequest ──> MedicationDispense ──> Medication
-                          (prescribed by Practitioner)
+   ├── has_cost ──> ServiceCost (annual parts + labor + PM)
+   │
+   └── matched_to <── SiteEquipment ──located_in──> Department ──part_of_site──> Site
 ```
 
-**The "killer" demo question:** *"How many distinct patients did Dr. Chen treat, and what were they prescribed?"*
-- **Naive SQL fails:** `PHYSICIAN` ≠ `RENDERING_PROVIDER` ≠ `PRESCRIBER`; `PATIENT` ≠ `MEMBER` ≠ `SUBSCRIBER`; EMR drug names ≠ pharmacy brand names.
-- **With the ontology:** `Practitioner` (NPI `1003000001`) resolves all three name forms; `Patient` is de-duplicated across systems; `Medication` is normalized via the RxNorm↔NDC crosswalk — including the NULL-RxNorm cases. → **9 patients.**
-
-The data ships with family/coverage cases for relationship demos: `SUBFAM1` (James Johnson self + Linda Williams spouse), `SUBFAM2` (MBR0013 + MBR0014 spouse), `SUBFAM3` (MBR0027 + MBR0028 child).
-
-Why this is hard — and how the ontology earns its keep — comes from the source data's deliberate messiness. See **[`sql/data/README.md`](sql/data/README.md)** for the eight alignment challenges (overloaded tables, name divergence, imperfect keys, code crosswalks, and more).
+**The "killer" demo question:** *"What is the estimated annual maintenance cost for this site's device fleet?"*
+- **Baseline agent fails:** site inventory says "GE B650" but TriMedx catalog says "B650" under manufacturer "GE" - the free-text manufacturer field doesn't join. The baseline can only price devices with exact key matches.
+- **With the ontology:** `FN_NORMALIZE_MFR` resolves "GE", "GE Healthcare", "General Electric Co", "GE Medical Systems", "G.E.", and "Gen Electric" to one canonical manufacturer. The 3-pass degrading-hierarchy matcher (exact model -> fuzzy model -> description) resolves 45%+ of the site's 139 devices automatically, producing a $676K fleet cost estimate. Unmatched devices are explicitly flagged as unpriced risk.
 
 ## What you deploy (at a glance)
 
-`./deploy.sh` builds, in `<ONTOLOGY_DB>.<ONTOLOGY_SCHEMA>` (default `CLINICAL_EMR.ONTOLOGY`), a full *Ontology-on-Snowflake* Knowledge-Graph stack:
+`./deploy.sh` builds, in `FDA_DEVICES.ONTOLOGY`, a full Ontology-on-Snowflake Knowledge-Graph stack:
 
-- A **physical KG** (`KG_NODE` / `KG_EDGE`) with cross-system entity resolution.
-- **22 ontology classes** and **33 relationships** (including 4 edges the raw schema has no foreign key for).
-- **4 Cortex Analyst semantic views** (base, KG, ontology, metadata).
-- **2 Cortex Agents** — the full ontology agent (8 intent-routed tools) and a deliberately limited **baseline** agent, so you can show the contrast.
+- **100 FDA device records** across 20+ manufacturers with deliberate naming inconsistencies
+- **100 TriMedx catalog entries** with device families, PM schedules, and annual cost estimates
+- **140 site inventory records** from a 450-bed hospital with ~15% hard-to-match entries
+- A **physical KG** (`KG_NODE` / `KG_EDGE`) with 583 nodes and 673 edges
+- **9 ontology classes** (Device, Manufacturer, DeviceFamily, SiteEquipment, ServiceCost, MaintenanceSchedule, FDARecord, Site, Department) and **8 relationships**
+- **4 Cortex Analyst semantic views** (base, KG, ontology, metadata)
+- **2 Cortex Agents** - the full MMD Ontology Agent (8 intent-routed tools) and a baseline agent for comparison
+- **Manufacturer alias resolution** via `FN_NORMALIZE_MFR` (handles 50+ name variants)
+- **3-pass device matching** with degrading confidence: EXACT_MODEL -> FUZZY_MODEL -> DESC_MATCH
 
-![The five-layer architecture: raw source data resolved into a knowledge graph, described by ontology metadata, exposed as semantic models, and reasoned over by a Cortex Agent](assets/images/architecture.png)
+## The source data's deliberate messiness
 
-**The payoff, measured:** ask both agents *"how many metformin-dispensed patients are also diabetic?"* The baseline bridges on SSN only and returns **7** (silently dropping the 2 NULL-SSN patients); the ontology agent applies the SSN → name+DOB fallback and returns the correct **9**. A semantic view can only join on keys that already exist; the ontology bakes the *degrading-hierarchy resolution* into a governed, deterministic layer.
+The demo works because the synthetic data has specific, realistic messiness:
 
-For the full class model, relationship catalog, layer inventory, agent tools, and a business-question + query cookbook, see **[`sql/ontology/README.md`](sql/ontology/README.md)**.
+1. **Same device, different names** - "GE Carescape B650" (TriMedx) vs "GE Healthcare CARESCAPE Monitor B650" (FDA) vs "GE B650" (site)
+2. **Manufacturer alias chaos** - "GE Healthcare", "General Electric Co", "GE Medical Systems", "GE", "G.E.", "Gen Electric", "GE Med Sys" are all one company
+3. **Missing identity keys** - not every device has an FDA DI; some site entries lack model numbers
+4. **Acquisition name changes** - "Toshiba" is now Canon Medical; "Covidien" is now Medtronic; "CareFusion" is now BD; "Maquet" is now Getinge
+5. **Model number formatting** - FDA includes revision suffixes (B650 v2, A500 SW 3.0); TriMedx uses short codes (B650, A500); site uses whatever the tech typed
+6. **Overloaded inventory rows** - each EQUIPMENT_LIST row carries device + location + service history + condition
+7. **Unmatched devices = unpriced risk** - every device that fails matching has no cost estimate, so the quote underestimates
+
+See [`sql/data/README.md`](sql/data/README.md) for the original alignment challenge reference.
 
 ## Repo layout
 
 ```
-snowflake-ontology-explorer/
-├── README.md                 # this file — purpose, deploy, run
-├── ADAPTING.md               # how to re-skin this demo for another vertical
-├── config.env.example        # deploy config (copy to config.env to rename databases)
+snowflake-ontology-explorer-trimedx/
+├── README.md                 # this file
+├── ADAPTING.md               # how the original healthcare demo was re-skinned
+├── config.env.example        # deploy config (copy to config.env)
 ├── deploy.sh                 # one-command render + deploy + verify + teardown
 ├── scripts/
-│   └── render.pl             # parameterization engine (default names <-> config.env)
+│   └── render.pl             # parameterization engine
 ├── sql/
-│   ├── data/                 # the three messy source systems + their README
-│   │   ├── 01_clinical_emr.sql   # CLINICAL_EMR.EHR   — PATIENT_MASTER, PHYSICIAN, DEPARTMENT, …
-│   │   ├── 02_payer_claims.sql   # PAYER_CLAIMS.CLAIMS — MEMBER, RENDERING_PROVIDER, CLAIMS_LINE, …
-│   │   ├── 03_pharmacy_ops.sql   # PHARMACY_OPS.RX     — SUBSCRIBER, PRESCRIBER, NDC_PRODUCT, …
-│   │   └── README.md             # what the data is + the 8 alignment challenges
+│   ├── data/                 # the three messy source systems
+│   │   ├── 01_fda_devices.sql      # FDA_DEVICES.GUDID - 100 GUDID device records
+│   │   ├── 02_trimedx_mmd.sql      # TRIMEDX_MMD.MASTER - catalog, manufacturers, families, PM, costs
+│   │   ├── 03_site_inventory.sql   # SITE_INVENTORY.RAW - 140 messy equipment records + site/departments
+│   │   └── README.md
 │   └── ontology/             # the ontology stack, one SQL file per build phase
-│       ├── 01_phase4_layers_1-3.sql                     # KG + resolution, metadata, views, SPs, UDFs
-│       ├── 02_phase4.5_base_semantic_view.sql           # base semantic view
+│       ├── 01_phase4_layers_1-3.sql                     # KG + resolution, metadata, views, UDFs
+│       ├── 02_phase4.5_base_semantic_view.sql           # base semantic view (raw tables)
 │       ├── 03_phase5_ontology_layer_semantic_views.sql  # KG / Ontology / Metadata semantic views
-│       ├── 04_phase6_cortex_agents.sql                  # ontology agent + baseline agent
+│       ├── 04_phase6_cortex_agents.sql                  # MMD Ontology Agent + baseline agent
 │       ├── verify.sql                                   # post-deploy count assertions
 │       ├── teardown.sql                                 # drop the demo databases
-│       └── README.md                                    # full ontology reference
+│       └── README.md
 └── ontology-explorer/        # local React + Express app: graph viz, class inspector, agent chat
 ```
 
-**Run order:** `./deploy.sh` handles it. Manually: `sql/data/01 → 02 → 03` → `sql/ontology/01 → 02 → 03 → 04`, all as a `CREATE DATABASE`-capable role.
+**Run order:** `./deploy.sh` handles it. Manually: `sql/data/01 -> 02 -> 03` then `sql/ontology/01 -> 02 -> 03 -> 04`, all as a `CREATE DATABASE`-capable role.
