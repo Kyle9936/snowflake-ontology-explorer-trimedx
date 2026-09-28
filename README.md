@@ -14,9 +14,26 @@ Use this repo to:
 
 ## The MMD problem
 
-When TriMedx takes over management of a new hospital site, the sales team needs to price the cost of managing the site's entire medical device fleet. Every device on the incoming inventory must be matched to a known Make, Model, and Description (MMD) record. That MMD record links the device to its parts replacement costs, maintenance schedules, failure rates, and service labor estimates - all of which drive the quote.
+### Business context
 
-The challenge: the same device appears differently across sources.
+TriMedx's sales team prices the cost of managing a new hospital site's medical device fleet by matching every device on the incoming inventory to a known Make, Model, and Description (MMD) record. That MMD record is what links a device to its parts replacement costs, maintenance schedules, failure rates, and service labor estimates - all of which drive the quote.
+
+**Incorrect device matching can result in thousands of dollars of difference per device in pricing quotes**, making accurate identification crucial for new site takeovers and customer pricing. Across a fleet of hundreds of devices, these errors compound into significant financial exposure.
+
+### Where they are today
+
+| Metric | Current state |
+|--------|--------------|
+| **Auto-match rate** | ~20% of devices are matched automatically on first pass |
+| **Overall match rate** | ~90% total (after manual review) |
+| **Manual review** | ~80% of matches require human review |
+| **Goal** | Increase automation by 20% through AI enhancements and data quality improvements |
+
+The team is actively building AI solutions and cleaner combined datasets (FDA + proprietary sources) to improve matching accuracy. This demo shows what an ontology-grounded approach looks like on Snowflake.
+
+### Why matching is hard
+
+The same device appears differently across sources:
 
 | Source | Example (same device) |
 |--------|----------------------|
@@ -24,7 +41,7 @@ The challenge: the same device appears differently across sources.
 | TriMedx master catalog | "GE" / "B650" / "Bedside patient monitor" |
 | Site inventory | "GE B650" or "G.E. Carescape B650" or "Gen Electric B650" |
 
-Without an ontology, matching is largely manual (~20% auto-match in TriMedx's current process). Wrong match = wrong price = the quote is off by thousands of dollars per device across hundreds of devices.
+Manufacturer names alone have dozens of variants ("GE Healthcare", "General Electric Co", "GE Medical Systems", "GE", "G.E.", "Gen Electric", "GE Med Sys"). Add model number formatting differences, legacy acquisition names (Toshiba -> Canon, Covidien -> Medtronic), and free-text descriptions, and the matching problem becomes combinatorial.
 
 ## Prerequisites
 

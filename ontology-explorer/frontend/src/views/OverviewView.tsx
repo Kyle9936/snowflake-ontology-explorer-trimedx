@@ -40,6 +40,22 @@ export default function OverviewView({ onOpen }: { onOpen: (v: View) => void }) 
         <Stat value={ov?.relationships ?? '—'} label="Relationships" accent="#7442BF" />
       </div>
 
+      <div className="challenges" style={{ marginBottom: '2rem' }}>
+        <h2>The problem</h2>
+        <p style={{ maxWidth: '72ch', lineHeight: 1.65, color: 'var(--text-secondary, #4a5b6e)' }}>
+          When taking over a new hospital site, every device on the incoming inventory must be matched
+          to a known Make, Model, and Description (MMD) record to price the cost of managing the fleet.
+          <strong> Incorrect matching can result in thousands of dollars of difference per device in
+          pricing quotes</strong>, compounding across hundreds of devices per site.
+        </p>
+        <div className="stat-grid" style={{ marginTop: '1.2rem' }}>
+          <Stat value="~20%" label="Auto-matched on first pass" accent="#F59F3B" />
+          <Stat value="~80%" label="Require manual review" accent="#e84545" />
+          <Stat value="90%" label="Overall match rate (after manual)" accent="#2FA84F" />
+          <Stat value="+20%" label="Target improvement via AI" accent="#29B5E8" />
+        </div>
+      </div>
+
       <div className="split-cards">
         <button className="feature-card" onClick={() => onOpen('source')}>
           <div className="feature-icon" style={{ background: 'rgba(245,159,59,0.14)', color: '#c47714' }}>
