@@ -172,7 +172,7 @@ export interface KnowledgeGraph {
   nodes: KGNode[];
   links: KGLink[];
   groups: Record<string, GroupInfo>;
-  stats: { patients: number; nodes: number; links: number };
+  stats: { devices: number; nodes: number; links: number };
 }
 
 async function getJson<T>(url: string): Promise<T> {

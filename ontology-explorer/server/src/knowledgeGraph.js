@@ -1,49 +1,36 @@
 /**
- * Instance-level knowledge graph builder.
+ * Instance-level knowledge graph builder for the MMD demo.
  *
  * Unlike ontology.js (which describes the *classes*), this assembles a graph of
- * the ACTUAL DATA: real patients resolved and stitched across the three source
- * systems (EHR + Claims + Pharmacy) into one connected graph.
+ * the ACTUAL DATA: real devices resolved and stitched across the three source
+ * systems (FDA + TriMedx + Site Inventory) into one connected graph.
  *
- * Entity resolution keys (verified against the sample data):
- *   - EHR <-> Claims : PATIENT_MASTER.INS_MEMBER_ID = MEMBER.MEMBER_ID = CLAIMS_LINE.MEMBER_ID
- *   - EHR <-> Pharmacy: SUBSCRIBER matched on SSN, else DOB (DOB is unique across
- *     all patients, so it covers the null-SSN pharmacy rows) -> RX_MEMBER_ID
- *   - Practitioner    : NPI (universal across all three systems)
- *   - Medication      : RxNorm; the NDC<->RxNorm crosswalk resolves EMR orders
- *     even when their RxNorm is NULL
+ * Entity resolution:
+ *   - TriMedx <-> FDA : DEVICE_CATALOG.FDA_DI = DEVICE_RECORD.GUDID_DI
+ *   - Site <-> TriMedx: degrading hierarchy via FN_NORMALIZE_MFR + model matching
+ *   - Manufacturer    : FN_NORMALIZE_MFR resolves all name variants to canonical
  *
- * "Concept" classes (Practitioner, Medication, Procedure, Condition, Location)
- * are SHARED hub nodes keyed by their code, so different patients connect
- * through the same doctor / drug / diagnosis — showing the value of unification.
+ * "Hub" nodes (Manufacturer, DeviceFamily) are SHARED, so different devices
+ * connect through the same manufacturer / family - showing the value of unification.
  */
 
 import { query } from './snowflake.js';
 import { GROUPS } from './ontology.js';
-import { EHR, CLAIMS, RX } from './dbconfig.js';
+import { EHR, CLAIMS, RX, ONTOLOGY } from './dbconfig.js';
 
-// class -> ontology group (drives node colour, reusing the ontology palette)
 const CLASS_GROUP = {
-    Patient: 'person',
-    Practitioner: 'person',
-    RelatedPerson: 'person',
-    Address: 'place',
-    Location: 'place',
-    Encounter: 'clinical',
-    Condition: 'clinical',
-    Medication: 'medication',
-    MedicationRequest: 'medication',
-    MedicationDispense: 'medication',
-    Coverage: 'financial',
-    Claim: 'financial',
-    Procedure: 'financial',
+    Device: 'device',
+    Manufacturer: 'device',
+    DeviceFamily: 'operations',
+    SiteEquipment: 'place',
+    ServiceCost: 'financial',
+    MaintenanceSchedule: 'operations',
+    FDARecord: 'regulatory',
+    Site: 'place',
+    Department: 'place',
 };
 const colorFor = (cls) => GROUPS[CLASS_GROUP[cls]]?.color || '#8595a6';
 
-// Canonicalize an ICD-10 code: strip the decimal so E11.9 (EMR) == E119 (claims).
-const canonIcd = (c) => String(c || '').replace('.', '').toUpperCase().trim();
-
-// Build a safe SQL IN-list from an array of string values.
 const inList = (arr) => {
     const vals = [...new Set(arr.filter((v) => v != null && v !== ''))];
     if (!vals.length) return `''`;
@@ -51,246 +38,181 @@ const inList = (arr) => {
 };
 
 /**
- * Build the instance graph for the first `limit` patients (ordered by MRN).
+ * Build the instance graph for the first `limit` devices (ordered by CATALOG_ID).
  * Returns { nodes, links, groups, stats }.
  */
 export async function getKnowledgeGraph(limit) {
-    const n = Math.max(1, Math.min(Number(limit) || 3, 50));
+    const n = Math.max(1, Math.min(Number(limit) || 10, 100));
 
-    // 1. Anchor patients (ordered by MRN so presets are stable/repeatable).
-    const patients = await query(
-        `select MRN, SSN, FIRST_NAME, MIDDLE_NAME, LAST_NAME, DOB, SEX,
-            ADDR_LINE1, CITY, STATE, ZIP,
-            PCP_NPI, INS_PAYER_NAME, INS_MEMBER_ID, INS_GROUP,
-            KIN_NAME, KIN_RELATION
-       from ${EHR}.PATIENT_MASTER
-      order by MRN
-      limit ${n}`
-    );
+    // 1. Anchor on canonical devices from TriMedx catalog.
+    const devices = await query(`
+        SELECT c.CATALOG_ID, c.MODEL_NUMBER, c.DEVICE_NAME, c.DEVICE_DESC,
+               c.FDA_DI, c.FDA_CLASS, c.FAMILY_ID, c.STATUS,
+               m.MFR_ID, m.MFR_NAME, m.MFR_FULL_NAME
+        FROM ${CLAIMS}.DEVICE_CATALOG c
+        JOIN ${CLAIMS}.MANUFACTURER m ON m.MFR_ID = c.MFR_ID
+        WHERE c.STATUS IN ('ACTIVE', 'LEGACY')
+        ORDER BY c.CATALOG_ID
+        LIMIT ${n}
+    `);
 
-    const mrns = patients.map((p) => p.MRN);
-    const memberIds = patients.map((p) => p.INS_MEMBER_ID);
-    const mrnList = inList(mrns);
-    const memberList = inList(memberIds);
+    if (!devices.length) return { nodes: [], links: [], groups: GROUPS, stats: {} };
 
-    // 2. Reference / child data (providers + departments are small — fetch all).
-    const [physicians, departments, subscribers, visits, problems, medOrders, claims, ndc] =
-        await Promise.all([
-            query(`select PHYSICIAN_ID, NPI, FULL_NAME, SPECIALTY from ${EHR}.PHYSICIAN`),
-            query(`select DEPT_ID, DEPT_NAME, FACILITY_NAME from ${EHR}.DEPARTMENT`),
-            query(`select RX_MEMBER_ID, PATIENT_SSN, PATIENT_NAME, DOB from ${RX}.SUBSCRIBER`),
-            query(
-                `select VISIT_ID, MRN, PHYSICIAN_ID, DEPT_ID, VISIT_DATE, VISIT_TYPE, PRIMARY_ICD10
-           from ${EHR}.VISIT where MRN in (${mrnList})`
-            ),
-            query(
-                `select PROBLEM_ID, MRN, ICD10_CODE, ICD10_DESC, STATUS
-           from ${EHR}.PROBLEM_LIST where MRN in (${mrnList})`
-            ),
-            query(
-                `select MED_ORDER_ID, MRN, PHYSICIAN_ID, ORDER_DATE, DRUG_NAME, RXNORM_CODE
-           from ${EHR}.MEDICATION where MRN in (${mrnList})`
-            ),
-            query(
-                `select CLAIM_ID, LINE_NO, MEMBER_ID, RENDERING_NPI, SERVICE_DATE,
-                DX_CODE, CPT_CODE, CPT_DESC, CLAIM_STATUS
-           from ${CLAIMS}.CLAIMS_LINE where MEMBER_ID in (${memberList})`
-            ),
-            query(`select NDC, RXNORM_CODE, BRAND_NAME, GENERIC_NAME from ${RX}.NDC_PRODUCT`),
-        ]);
+    const catalogIds = devices.map((d) => d.CATALOG_ID);
+    const fdaDis = devices.map((d) => d.FDA_DI).filter(Boolean);
+    const mfrIds = [...new Set(devices.map((d) => d.MFR_ID))];
+    const familyIds = [...new Set(devices.map((d) => d.FAMILY_ID).filter(Boolean))];
 
-    // ---- lookup maps --------------------------------------------------------
-    const physById = new Map(physicians.map((p) => [String(p.PHYSICIAN_ID), p]));
-    const physByNpi = new Map(physicians.map((p) => [String(p.NPI), p]));
-    const deptById = new Map(departments.map((d) => [String(d.DEPT_ID), d]));
+    // 2. Fetch related entities in parallel.
+    const [fdaRecords, families, costs, pmSchedules, siteEquipment, depts, sites] = await Promise.all([
+        fdaDis.length ? query(`
+            SELECT GUDID_DI, COMPANY_NAME, BRAND_NAME, VERSION_MODEL_NUMBER, DEVICE_CLASS, PRODUCT_CODE
+            FROM ${EHR}.DEVICE_RECORD WHERE GUDID_DI IN (${inList(fdaDis)})
+        `) : [],
+        familyIds.length ? query(`
+            SELECT FAMILY_ID, FAMILY_NAME, FAMILY_CATEGORY, AVG_USEFUL_LIFE_YEARS
+            FROM ${CLAIMS}.DEVICE_FAMILY WHERE FAMILY_ID IN (${inList(familyIds)})
+        `) : [],
+        query(`
+            SELECT COST_ID, CATALOG_ID, ANNUAL_PARTS_COST, ANNUAL_LABOR_COST, ANNUAL_TOTAL_COST, RISK_TIER
+            FROM ${CLAIMS}.SERVICE_COST_ESTIMATE WHERE CATALOG_ID IN (${inList(catalogIds)})
+        `),
+        familyIds.length ? query(`
+            SELECT PM_ID, FAMILY_ID, PM_TYPE, INTERVAL_MONTHS, EST_LABOR_HOURS
+            FROM ${CLAIMS}.PM_SCHEDULE WHERE FAMILY_ID IN (${inList(familyIds)})
+        `) : [],
+        query(`
+            SELECT se.EQUIP_ID, se.MANUFACTURER AS RAW_MFR, se.MODEL AS RAW_MODEL,
+                   se.DEVICE_DESCRIPTION AS RAW_DESC, se.SERIAL_NUMBER, se.DEPT_ID,
+                   se.CONDITION, se.STATUS,
+                   sm.CATALOG_ID AS RESOLVED_CATALOG_ID, sm.MATCH_BASIS
+            FROM ${RX}.EQUIPMENT_LIST se
+            JOIN ${ONTOLOGY}.STG_MAP_SITE_TO_CATALOG sm ON sm.EQUIP_ID = se.EQUIP_ID
+            WHERE sm.CATALOG_ID IN (${inList(catalogIds)})
+            ORDER BY se.EQUIP_ID
+        `),
+        query(`SELECT DEPT_ID, DEPT_NAME, FLOOR, WING, SITE_ID FROM ${RX}.DEPARTMENT`),
+        query(`SELECT SITE_ID, SITE_NAME, SITE_TYPE, BED_COUNT FROM ${RX}.SITE_INFO`),
+    ]);
 
-    // NDC -> RxNorm, and generic-name -> RxNorm (for null-RxNorm EMR orders).
-    const rxByNdc = new Map();
-    const rxByGeneric = new Map();
-    const drugByRx = new Map();
-    for (const p of ndc) {
-        rxByNdc.set(p.NDC, p.RXNORM_CODE);
-        if (p.GENERIC_NAME) rxByGeneric.set(p.GENERIC_NAME.toUpperCase(), p.RXNORM_CODE);
-        if (!drugByRx.has(p.RXNORM_CODE))
-            drugByRx.set(p.RXNORM_CODE, { generic: p.GENERIC_NAME, brand: p.BRAND_NAME });
-    }
-    // Resolve an EMR order's drug to a canonical RxNorm even when RXNORM_CODE is null.
-    const resolveRx = (rxnorm, drugName) => {
-        if (rxnorm) return rxnorm;
-        const first = String(drugName || '').split(/\s+/)[0].toUpperCase();
-        for (const [generic, rx] of rxByGeneric) if (generic.startsWith(first)) return rx;
-        return null;
-    };
-
-    // Resolve each patient to a pharmacy RX_MEMBER_ID via SSN, else DOB.
-    const subBySsn = new Map(subscribers.filter((s) => s.PATIENT_SSN).map((s) => [s.PATIENT_SSN, s]));
-    const subByDob = new Map(subscribers.map((s) => [String(s.DOB), s]));
-    const rxMemberByMrn = new Map();
-    for (const p of patients) {
-        const sub = (p.SSN && subBySsn.get(p.SSN)) || subByDob.get(String(p.DOB));
-        if (sub) rxMemberByMrn.set(p.MRN, sub.RX_MEMBER_ID);
-    }
-    const rxMemberToMrn = new Map([...rxMemberByMrn].map(([mrn, rx]) => [rx, mrn]));
-
-    // Now scope pharmacy fills to the resolved rx-member ids.
-    const rxMemberList = inList([...rxMemberByMrn.values()]);
-    const fillRows = await query(
-        `select FILL_ID, RX_MEMBER_ID, PRESCRIBER_ID, NDC, DRUG_DESC,
-            WRITTEN_DATE, FILL_DATE, FILL_STATUS
-       from ${RX}.PHARMACY_FILL where RX_MEMBER_ID in (${rxMemberList})`
-    );
-
-    // ---- graph assembly -----------------------------------------------------
-    const nodes = new Map();
+    // 3. Build graph nodes + links.
+    const nodes = [];
     const links = [];
+    const nodeIds = new Set();
+
     const addNode = (id, cls, label, detail) => {
-        if (!nodes.has(id)) nodes.set(id, { id, cls, label, detail, group: CLASS_GROUP[cls], color: colorFor(cls) });
-        return id;
-    };
-    const linkKeys = new Set();
-    const addLink = (source, target, label) => {
-        if (!source || !target) return;
-        const k = `${source}->${target}:${label}`;
-        if (linkKeys.has(k)) return;
-        linkKeys.add(k);
-        links.push({ source, target, label });
+        if (nodeIds.has(id)) return;
+        nodeIds.add(id);
+        nodes.push({ id, label, group: CLASS_GROUP[cls], color: colorFor(cls), cls, detail });
     };
 
-    // Patients (+ their per-patient satellites).
-    for (const p of patients) {
-        const fullName = [p.FIRST_NAME, p.LAST_NAME].filter(Boolean).join(' ');
-        const pid = addNode(`pat:${p.MRN}`, 'Patient', fullName, `MRN ${p.MRN} · resolved across all 3 systems`);
+    const addLink = (src, tgt, label) => {
+        if (!nodeIds.has(src) || !nodeIds.has(tgt)) return;
+        links.push({ source: src, target: tgt, label });
+    };
 
-        if (p.INS_PAYER_NAME) {
-            const cid = addNode(`cov:${p.MRN}`, 'Coverage', p.INS_PAYER_NAME, `Member ${p.INS_MEMBER_ID} · ${p.INS_GROUP || ''}`);
-            addLink(pid, cid, 'has coverage');
-        }
-        if (p.ADDR_LINE1) {
-            const aid = addNode(`addr:${p.MRN}`, 'Address', `${p.ADDR_LINE1}`, `${p.CITY}, ${p.STATE} ${p.ZIP}`);
-            addLink(pid, aid, 'has address');
-        }
-        if (p.KIN_NAME) {
-            const kid = addNode(`kin:${p.MRN}`, 'RelatedPerson', p.KIN_NAME, p.KIN_RELATION || 'next of kin');
-            addLink(pid, kid, 'related to');
-        }
-    }
+    // Manufacturers (hub nodes)
+    const mfrMap = {};
+    devices.forEach((d) => {
+        const mfrNodeId = `MFR:${d.MFR_ID}`;
+        mfrMap[d.MFR_ID] = mfrNodeId;
+        addNode(mfrNodeId, 'Manufacturer', d.MFR_NAME, `${d.MFR_FULL_NAME}`);
+    });
 
-    // Encounters (VISIT) -> Practitioner, Location, primary Condition.
-    for (const v of visits) {
-        const pid = `pat:${v.MRN}`;
-        const eid = addNode(`enc:${v.VISIT_ID}`, 'Encounter', `${v.VISIT_TYPE || 'Visit'} ${fmtDate(v.VISIT_DATE)}`, `Visit ${v.VISIT_ID}`);
-        addLink(pid, eid, 'subject of');
+    // Device families (hub nodes)
+    const famMap = {};
+    families.forEach((f) => {
+        const famNodeId = `FAM:${f.FAMILY_ID}`;
+        famMap[f.FAMILY_ID] = famNodeId;
+        addNode(famNodeId, 'DeviceFamily', f.FAMILY_NAME, `${f.FAMILY_CATEGORY} | Life: ${f.AVG_USEFUL_LIFE_YEARS}yr`);
+    });
 
-        const phys = physById.get(String(v.PHYSICIAN_ID));
-        if (phys) {
-            const prov = addNode(`prov:${phys.NPI}`, 'Practitioner', phys.FULL_NAME, `NPI ${phys.NPI} · ${phys.SPECIALTY || ''}`);
-            addLink(eid, prov, 'performed by');
-        }
-        const dept = deptById.get(String(v.DEPT_ID));
-        if (dept) {
-            const loc = addNode(`loc:${v.DEPT_ID}`, 'Location', dept.DEPT_NAME, dept.FACILITY_NAME);
-            addLink(eid, loc, 'at');
-        }
-        if (v.PRIMARY_ICD10) {
-            const code = canonIcd(v.PRIMARY_ICD10);
-            const cid = addNode(`cond:${code}`, 'Condition', code, 'diagnosis code');
-            addLink(eid, cid, 'has diagnosis');
-        }
-    }
+    // Sites
+    sites.forEach((s) => {
+        addNode(`SITE:${s.SITE_ID}`, 'Site', s.SITE_NAME, `${s.SITE_TYPE} | ${s.BED_COUNT} beds`);
+    });
 
-    // Problem list -> shared Condition hubs (patient-level).
-    for (const pr of problems) {
-        const code = canonIcd(pr.ICD10_CODE);
-        const cid = addNode(`cond:${code}`, 'Condition', code, pr.ICD10_DESC || 'diagnosis code');
-        addLink(`pat:${pr.MRN}`, cid, 'has condition');
-    }
+    // Departments
+    const deptSiteMap = {};
+    depts.forEach((d) => {
+        const deptNodeId = `DEPT:${d.DEPT_ID}`;
+        addNode(deptNodeId, 'Department', d.DEPT_NAME, `Floor ${d.FLOOR} ${d.WING}`);
+        deptSiteMap[d.DEPT_ID] = d.SITE_ID;
+        addLink(deptNodeId, `SITE:${d.SITE_ID}`, 'part_of_site');
+    });
 
-    // Claims (grouped) -> Procedure, Condition, Practitioner, Coverage.
-    const memberToMrn = new Map(patients.map((p) => [p.INS_MEMBER_ID, p.MRN]));
-    for (const c of claims) {
-        const mrn = memberToMrn.get(c.MEMBER_ID);
-        if (!mrn) continue;
-        const clmId = addNode(`clm:${c.CLAIM_ID}`, 'Claim', c.CLAIM_ID, `${c.CLAIM_STATUS || ''} · ${fmtDate(c.SERVICE_DATE)}`);
-        addLink(`pat:${mrn}`, clmId, 'subject of');
+    // Devices
+    devices.forEach((d) => {
+        const devNodeId = `DEV:${d.CATALOG_ID}`;
+        addNode(devNodeId, 'Device', d.DEVICE_NAME, `${d.MFR_NAME} ${d.MODEL_NUMBER} | ${d.DEVICE_DESC}`);
+        // made_by
+        if (mfrMap[d.MFR_ID]) addLink(devNodeId, mfrMap[d.MFR_ID], 'made_by');
+        // belongs_to_family
+        if (d.FAMILY_ID && famMap[d.FAMILY_ID]) addLink(devNodeId, famMap[d.FAMILY_ID], 'belongs_to_family');
+    });
 
-        if (c.CPT_CODE) {
-            const proc = addNode(`proc:${c.CPT_CODE}`, 'Procedure', c.CPT_CODE, c.CPT_DESC || 'procedure');
-            addLink(clmId, proc, 'has procedure');
-        }
-        if (c.DX_CODE) {
-            const code = canonIcd(c.DX_CODE);
-            const cid = addNode(`cond:${code}`, 'Condition', code, 'diagnosis code');
-            addLink(clmId, cid, 'has diagnosis');
-        }
-        const prov = physByNpi.get(String(c.RENDERING_NPI));
-        if (prov) {
-            const provId = addNode(`prov:${prov.NPI}`, 'Practitioner', prov.FULL_NAME, `NPI ${prov.NPI} · ${prov.SPECIALTY || ''}`);
-            addLink(clmId, provId, 'rendered by');
-        }
-        if (nodes.has(`cov:${mrn}`)) addLink(clmId, `cov:${mrn}`, 'covered by');
-    }
+    // FDA records
+    fdaRecords.forEach((f) => {
+        const fdaNodeId = `FDA:${f.GUDID_DI}`;
+        addNode(fdaNodeId, 'FDARecord', f.BRAND_NAME, `${f.COMPANY_NAME} | Class ${f.DEVICE_CLASS} | ${f.PRODUCT_CODE}`);
+    });
+    devices.forEach((d) => {
+        if (d.FDA_DI) addLink(`DEV:${d.CATALOG_ID}`, `FDA:${d.FDA_DI}`, 'has_fda_record');
+    });
 
-    // Medication requests (EMR orders) -> Practitioner, Medication (RxNorm).
-    const orderIndex = new Map(); // `${mrn}|${npi}|${rx}` -> requestNodeId (to match fills)
-    for (const m of medOrders) {
-        const rx = resolveRx(m.RXNORM_CODE, m.DRUG_NAME);
-        const reqId = addNode(`mreq:${m.MED_ORDER_ID}`, 'MedicationRequest', m.DRUG_NAME, `ordered ${fmtDate(m.ORDER_DATE)}`);
-        addLink(`pat:${m.MRN}`, reqId, 'subject of');
+    // Service costs
+    costs.forEach((c) => {
+        const costNodeId = `COST:${c.COST_ID}`;
+        addNode(costNodeId, 'ServiceCost', `$${Number(c.ANNUAL_TOTAL_COST).toLocaleString()}/yr`, `Parts $${c.ANNUAL_PARTS_COST} | Labor $${c.ANNUAL_LABOR_COST} | ${c.RISK_TIER} risk`);
+        addLink(`DEV:${c.CATALOG_ID}`, costNodeId, 'has_cost');
+    });
 
-        const phys = physById.get(String(m.PHYSICIAN_ID));
-        if (phys) {
-            const prov = addNode(`prov:${phys.NPI}`, 'Practitioner', phys.FULL_NAME, `NPI ${phys.NPI} · ${phys.SPECIALTY || ''}`);
-            addLink(reqId, prov, 'prescribed by');
-            if (rx) orderIndex.set(`${m.MRN}|${phys.NPI}|${rx}`, reqId);
-        }
-        if (rx) {
-            const drug = drugByRx.get(rx);
-            const medId = addNode(`med:${rx}`, 'Medication', drug?.generic || m.DRUG_NAME, `RxNorm ${rx}${drug?.brand ? ` · ${drug.brand}` : ''}`);
-            addLink(reqId, medId, 'of drug');
-        }
-    }
+    // PM schedules
+    pmSchedules.forEach((p) => {
+        const pmNodeId = `PM:${p.PM_ID}`;
+        addNode(pmNodeId, 'MaintenanceSchedule', `${p.PM_TYPE}`, `Every ${p.INTERVAL_MONTHS}mo | ${p.EST_LABOR_HOURS}hr labor`);
+        if (famMap[p.FAMILY_ID]) addLink(famMap[p.FAMILY_ID], pmNodeId, 'has_pm_schedule');
+    });
 
-    // Pharmacy fills (dispenses) -> Medication (NDC->RxNorm), Practitioner, fulfilled-by request.
-    for (const f of fillRows) {
-        const mrn = rxMemberToMrn.get(f.RX_MEMBER_ID);
-        if (!mrn) continue;
-        const disId = addNode(`mdis:${f.FILL_ID}`, 'MedicationDispense', f.DRUG_DESC, `${f.FILL_STATUS || ''} · filled ${fmtDate(f.FILL_DATE)}`);
-        addLink(`pat:${mrn}`, disId, 'subject of');
+    // Site equipment (the raw inventory items)
+    siteEquipment.forEach((se) => {
+        const seNodeId = `SE:${se.EQUIP_ID}`;
+        const matchInfo = se.RESOLVED_CATALOG_ID ? ` [${se.MATCH_BASIS}]` : ' [UNMATCHED]';
+        addNode(seNodeId, 'SiteEquipment', `${se.RAW_MFR} ${se.RAW_MODEL}`, `${se.RAW_DESC} | ${se.CONDITION}${matchInfo}`);
+        // matched_to
+        if (se.RESOLVED_CATALOG_ID) addLink(seNodeId, `DEV:${se.RESOLVED_CATALOG_ID}`, 'matched_to');
+        // located_in
+        if (se.DEPT_ID) addLink(seNodeId, `DEPT:${se.DEPT_ID}`, 'located_in');
+    });
 
-        const rx = rxByNdc.get(f.NDC);
-        if (rx) {
-            const drug = drugByRx.get(rx);
-            const medId = addNode(`med:${rx}`, 'Medication', drug?.generic || f.DRUG_DESC, `RxNorm ${rx}${drug?.brand ? ` · ${drug.brand}` : ''}`);
-            addLink(disId, medId, 'of drug');
-            // Link back to the originating order (fulfilled by) when we can match it.
-            const reqId = orderIndex.get(`${mrn}|${f.PRESCRIBER_ID}|${rx}`);
-            if (reqId) addLink(reqId, disId, 'fulfilled by');
-        }
-        const prov = physByNpi.get(String(f.PRESCRIBER_ID));
-        if (prov) {
-            const provId = addNode(`prov:${prov.NPI}`, 'Practitioner', prov.FULL_NAME, `NPI ${prov.NPI} · ${prov.SPECIALTY || ''}`);
-            addLink(disId, provId, 'prescribed by');
-        }
-    }
+    // 4. Compute degree for each node (used for sizing in the frontend).
+    const degreeMap = new Map();
+    links.forEach((l) => {
+        degreeMap.set(l.source, (degreeMap.get(l.source) || 0) + 1);
+        degreeMap.set(l.target, (degreeMap.get(l.target) || 0) + 1);
+    });
+    nodes.forEach((n) => { n.degree = degreeMap.get(n.id) || 0; });
 
-    // Degree for node sizing.
-    const degree = new Map();
-    for (const l of links) {
-        degree.set(l.source, (degree.get(l.source) || 0) + 1);
-        degree.set(l.target, (degree.get(l.target) || 0) + 1);
-    }
-    const nodeArr = [...nodes.values()].map((nd) => ({ ...nd, degree: degree.get(nd.id) || 0 }));
+    // 5. Stats
+    const matched = siteEquipment.filter((se) => se.RESOLVED_CATALOG_ID != null).length;
+    const total = siteEquipment.length;
+    const totalCost = costs.reduce((sum, c) => sum + Number(c.ANNUAL_TOTAL_COST || 0), 0);
 
     return {
-        nodes: nodeArr,
+        nodes,
         links,
         groups: GROUPS,
-        stats: { patients: n, nodes: nodeArr.length, links: links.length },
+        stats: {
+            devices: devices.length,
+            siteEquipment: total,
+            matched,
+            unmatched: total - matched,
+            matchRate: total > 0 ? `${((matched / total) * 100).toFixed(1)}%` : 'N/A',
+            totalAnnualCost: `$${totalCost.toLocaleString()}`,
+            manufacturers: mfrIds.length,
+            families: families.length,
+            nodes: nodes.length,
+            links: links.length,
+        },
     };
-}
-
-function fmtDate(d) {
-    if (!d) return '';
-    const s = typeof d === 'string' ? d : new Date(d).toISOString();
-    return s.slice(0, 10);
 }

@@ -17,8 +17,8 @@ import { ONTOLOGY } from './dbconfig.js';
 // The ontology agents this app can talk to, by short UI key. Names are built
 // from the configured ontology schema so a renamed deployment still resolves.
 const AGENTS = {
-    ontology: `${ONTOLOGY}.HEALTHCARE_ONTOLOGY_AGENT`,
-    base: `${ONTOLOGY}.HEALTHCARE_BASE_AGENT`,
+    ontology: `${ONTOLOGY}.MMD_ONTOLOGY_AGENT`,
+    base: `${ONTOLOGY}.MMD_BASE_AGENT`,
 };
 const DEFAULT_AGENT = AGENTS.ontology;
 

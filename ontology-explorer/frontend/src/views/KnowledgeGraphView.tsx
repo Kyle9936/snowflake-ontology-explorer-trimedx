@@ -36,7 +36,7 @@ export default function KnowledgeGraphView() {
     return () => ro.disconnect();
   }, []);
 
-  // Fetch the graph whenever the patient count changes.
+    // Fetch the graph whenever the device count changes.
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -94,11 +94,11 @@ export default function KnowledgeGraphView() {
 
   return (
     <div className="canvas-wrap" ref={wrapRef}>
-      <div className="canvas-hint">Real records, resolved across EHR + Claims + Pharmacy · shared doctors &amp; drugs connect patients</div>
+      <div className="canvas-hint">Real records, resolved across FDA + TriMedx + Site Inventory - shared manufacturers &amp; families connect devices</div>
 
-      {/* patient-count presets */}
+      {/* device-count presets */}
       <div className="kg-count">
-        <span className="kg-count-label">Patients</span>
+        <span className="kg-count-label">Devices</span>
         <div className="kg-seg">
           {PRESETS.map((p) => (
             <button

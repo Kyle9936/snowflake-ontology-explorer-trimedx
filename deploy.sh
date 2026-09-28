@@ -31,16 +31,16 @@ fi
 : "${SNOWFLAKE_CONNECTION:=DEMO}"
 : "${BUILD_ROLE:=SYSADMIN}"
 : "${WAREHOUSE:=COMPUTE_WH}"
-: "${EMR_DB:=CLINICAL_EMR}";    : "${EMR_SCHEMA:=EHR}"
+: "${EMR_DB:=FDA_DEVICES}";    : "${EMR_SCHEMA:=GUDID}"
 : "${ONTOLOGY_DB:=$EMR_DB}";    : "${ONTOLOGY_SCHEMA:=ONTOLOGY}"
-: "${CLAIMS_DB:=PAYER_CLAIMS}"; : "${CLAIMS_SCHEMA:=CLAIMS}"
-: "${RX_DB:=PHARMACY_OPS}";     : "${RX_SCHEMA:=RX}"
+: "${CLAIMS_DB:=TRIMEDX_MMD}"; : "${CLAIMS_SCHEMA:=MASTER}"
+: "${RX_DB:=SITE_INVENTORY}";     : "${RX_SCHEMA:=RAW}"
 export EMR_DB EMR_SCHEMA ONTOLOGY_DB ONTOLOGY_SCHEMA CLAIMS_DB CLAIMS_SCHEMA RX_DB RX_SCHEMA WAREHOUSE
 
 SOURCE_FILES=(
-  sql/data/01_clinical_emr.sql
-  sql/data/02_payer_claims.sql
-  sql/data/03_pharmacy_ops.sql
+  sql/data/01_fda_devices.sql
+  sql/data/02_trimedx_mmd.sql
+  sql/data/03_site_inventory.sql
 )
 ONTOLOGY_FILES=(
   sql/ontology/01_phase4_layers_1-3.sql
@@ -71,8 +71,8 @@ require_snow() {
 banner() {
   echo "----------------------------------------------------------------------"
   echo " connection : $SNOWFLAKE_CONNECTION   role: $BUILD_ROLE   wh: $WAREHOUSE"
-  echo " databases  : EMR=$EMR_DB.$EMR_SCHEMA  ONTOLOGY=$ONTOLOGY_DB.$ONTOLOGY_SCHEMA"
-  echo "              CLAIMS=$CLAIMS_DB.$CLAIMS_SCHEMA  RX=$RX_DB.$RX_SCHEMA"
+  echo " databases  : FDA=$EMR_DB.$EMR_SCHEMA  ONTOLOGY=$ONTOLOGY_DB.$ONTOLOGY_SCHEMA"
+  echo "              TRIMEDX=$CLAIMS_DB.$CLAIMS_SCHEMA  SITE=$RX_DB.$RX_SCHEMA"
   echo "----------------------------------------------------------------------"
 }
 

@@ -1,13 +1,12 @@
 /**
- * Canonical ontology definition for the "messy healthcare data" demo.
+ * Canonical ontology definition for the MMD (Make, Model, Description) demo.
  *
- * This is a hand-authored model derived from README.md + the sql/ source
- * scripts. It renders a meaningful, explorable graph TODAY, before the live
- * ontology layer (semantic view / KG tables) exists.
+ * This is a hand-authored model for the TriMedx device fleet management use
+ * case. It renders a meaningful, explorable graph showing how medical devices
+ * connect across FDA, TriMedx, and site inventory sources.
  *
- * When the real ontology is ready, replace `getOntology()` with a query that
- * reads nodes/edges from the ontology layer — the API shape below is all the
- * frontend depends on.
+ * The frontend depends only on the JSON shape below (GROUPS, NODES, EDGES,
+ * getOntology). No React changes needed.
  */
 
 import {
@@ -16,312 +15,203 @@ import {
 } from './dbconfig.js';
 
 export const GROUPS = {
-    person: { label: 'People', color: '#29B5E8' },
-    clinical: { label: 'Clinical', color: '#7442BF' },
-    medication: { label: 'Medication', color: '#2FA84F' },
+    device: { label: 'Device', color: '#29B5E8' },
+    operations: { label: 'Operations', color: '#7442BF' },
     financial: { label: 'Financial', color: '#F59F3B' },
     place: { label: 'Place', color: '#11567F' },
+    regulatory: { label: 'Regulatory', color: '#2FA84F' },
 };
 
 const NODES = [
     {
-        id: 'Patient',
-        label: 'Patient',
-        group: 'person',
+        id: 'Device',
+        label: 'Device',
+        group: 'device',
         description:
-            'A person receiving care. The same real-world person appears in all three source systems under different identifiers and name formats; the ontology resolves them into one Patient node.',
+            'A canonical medical device from the TriMedx MMD catalog. Resolves naming variants across FDA, TriMedx, and site inventories into one identity. The same device may appear as "GE Carescape B650" (TriMedx), "GE Healthcare CARESCAPE Monitor B650" (FDA), and "GE B650" or "G.E. Carescape B650" (site inventory).',
         properties: [
-            { name: 'patientId', description: 'Canonical resolved identity' },
-            { name: 'name', description: 'Reconciled from discrete parts, "LAST, FIRST M", and nicknames' },
-            { name: 'dob', description: 'Date of birth (weak identity key when SSN is null)' },
-            { name: 'sex', description: 'Canonicalized from M/F and 1/2 encodings' },
-            { name: 'ssn', description: 'Medium-strength cross-system link (null for some members)' },
+            { name: 'catalogId', description: 'TriMedx internal catalog identifier (canonical key)' },
+            { name: 'tmxModel', description: 'TriMedx model designation' },
+            { name: 'deviceName', description: 'Short commercial device name' },
+            { name: 'canonicalMfr', description: 'Resolved manufacturer name via FN_NORMALIZE_MFR' },
+            { name: 'familyName', description: 'Device family for pricing and PM scheduling' },
+            { name: 'fdaDi', description: 'FDA GUDID identifier (nullable - not all devices linked to FDA)' },
+            { name: 'fdaClass', description: 'FDA risk classification (1, 2, or 3)' },
         ],
         mappings: [
-            { system: EMR_DB, table: 'PATIENT_MASTER', note: 'MRN; discrete name parts' },
-            { system: CLAIMS_DB, table: 'MEMBER / SUBSCRIBER', note: '"LAST, FIRST M"' },
-            { system: RX_DB, table: 'SUBSCRIBER', note: 'nicknames (Bob, Jim, Beth…)' },
-            { system: RX_DB, table: 'PHARMACY_FILL', note: 'referenced — patient on the fill' },
+            { system: CLAIMS_DB, table: 'DEVICE_CATALOG', note: 'Canonical anchor; MODEL_NUMBER + DEVICE_NAME + FDA_DI' },
+            { system: EMR_DB, table: 'DEVICE_RECORD', note: 'Enrichment via GUDID_DI; regulatory description + classification' },
+            { system: RX_DB, table: 'EQUIPMENT_LIST', note: 'Resolved via degrading-hierarchy matching (exact model > fuzzy model > description)' },
         ],
         sampleQuery:
-            'select MRN, FIRST_NAME, LAST_NAME, DOB, SEX, SSN from CLINICAL_EMR.EHR.PATIENT_MASTER limit 8',
+            `select CATALOG_ID, MODEL_NUMBER, DEVICE_NAME, DEVICE_DESC, FDA_DI from ${CLAIMS_DB}.${CLAIMS_SCHEMA}.DEVICE_CATALOG limit 8`,
     },
     {
-        id: 'Practitioner',
-        label: 'Practitioner',
-        group: 'person',
+        id: 'Manufacturer',
+        label: 'Manufacturer',
+        group: 'device',
         description:
-            'A clinician. Keyed on NPI (the one universal join key), which resolves "Sarah Chen, MD" / "CHEN, SARAH" / "S CHEN" into a single provider.',
+            'A device manufacturer. Resolves aliases across systems: "GE Healthcare" (FDA), "GE" (TriMedx), "G.E." / "Gen Electric" / "GE Med Sys" (site inventories) all map to one canonical Manufacturer.',
         properties: [
-            { name: 'npi', description: 'National Provider Identifier — universal key' },
-            { name: 'name', description: 'Varied formats treated as attributes' },
-            { name: 'specialty', description: 'Normalized (e.g. "Internal Medicine" == "INTERNAL MED")' },
+            { name: 'mfrId', description: 'TriMedx manufacturer ID (canonical key)' },
+            { name: 'canonicalName', description: 'Resolved via FN_NORMALIZE_MFR' },
+            { name: 'mfrShort', description: 'TriMedx internal abbreviation (GE, Phil, Siemens)' },
+            { name: 'fdaNameVariants', description: 'All distinct FDA COMPANY_NAME values for this manufacturer' },
+            { name: 'mfrCountry', description: 'Country of origin' },
         ],
         mappings: [
-            { system: EMR_DB, table: 'PHYSICIAN', note: 'NPI + "Sarah Chen, MD"' },
-            { system: CLAIMS_DB, table: 'RENDERING_PROVIDER', note: 'RENDERING_NPI + "CHEN, SARAH"' },
-            { system: RX_DB, table: 'PRESCRIBER', note: 'PRESCRIBER_ID + "S CHEN"' },
-            { system: EMR_DB, table: 'PATIENT_MASTER', note: 'referenced — PCP (PCP_NPI)' },
-            { system: EMR_DB, table: 'VISIT', note: 'referenced — rendering provider on the encounter' },
-            { system: CLAIMS_DB, table: 'CLAIMS_LINE', note: 'referenced — rendering provider on the claim' },
-            { system: RX_DB, table: 'PHARMACY_FILL', note: 'referenced — prescriber on the fill' },
+            { system: CLAIMS_DB, table: 'MANUFACTURER', note: 'MFR_ID + MFR_NAME (abbreviated)' },
+            { system: EMR_DB, table: 'DEVICE_RECORD', note: 'COMPANY_NAME (free-text, multiple variants per mfr)' },
+            { system: RX_DB, table: 'EQUIPMENT_LIST', note: 'MANUFACTURER (wildly inconsistent free-text)' },
         ],
         sampleQuery:
-            'select PHYSICIAN_ID, NPI, FULL_NAME, SPECIALTY from CLINICAL_EMR.EHR.PHYSICIAN limit 8',
+            `select MFR_ID, MFR_NAME, MFR_FULL_NAME, MFR_COUNTRY from ${CLAIMS_DB}.${CLAIMS_SCHEMA}.MANUFACTURER limit 8`,
     },
     {
-        id: 'RelatedPerson',
-        label: 'Related Person',
-        group: 'person',
+        id: 'DeviceFamily',
+        label: 'Device Family',
+        group: 'operations',
         description:
-            'Next-of-kin / emergency contact. Embedded as KIN_* columns inside the overloaded PATIENT_MASTER row and decomposed into its own node.',
+            'A logical grouping of similar devices for pricing, PM scheduling, and fleet analysis. Examples: Bedside Monitors, CT Scanners, Critical Care Ventilators, Infusion Pumps. TriMedx-only concept not present in FDA or site data.',
         properties: [
-            { name: 'name', description: 'KIN_NAME' },
-            { name: 'relationship', description: 'Spouse / Parent / Child' },
-            { name: 'phone', description: 'KIN_PHONE' },
+            { name: 'familyId', description: 'Family identifier' },
+            { name: 'familyName', description: 'Display name (e.g. "Bedside Monitors")' },
+            { name: 'familyCategory', description: 'Broad category (Patient Monitoring, Diagnostic Imaging, etc.)' },
+            { name: 'avgUsefulLifeYears', description: 'Typical useful life for devices in this family' },
         ],
         mappings: [
-            { system: EMR_DB, table: 'PATIENT_MASTER', note: 'KIN_NAME, KIN_RELATION, KIN_PHONE' },
+            { system: CLAIMS_DB, table: 'DEVICE_FAMILY', note: 'FAMILY_ID + FAMILY_NAME + FAMILY_CATEGORY' },
         ],
         sampleQuery:
-            'select MRN, KIN_NAME, KIN_RELATION, KIN_PHONE from CLINICAL_EMR.EHR.PATIENT_MASTER limit 8',
+            `select FAMILY_ID, FAMILY_NAME, FAMILY_CATEGORY, AVG_USEFUL_LIFE_YEARS from ${CLAIMS_DB}.${CLAIMS_SCHEMA}.DEVICE_FAMILY limit 8`,
     },
     {
-        id: 'Address',
-        label: 'Address',
+        id: 'SiteEquipment',
+        label: 'Site Equipment',
         group: 'place',
         description:
-            'A postal address. Extracted from inline ADDR_* columns on the patient row into a first-class node.',
+            'A physical device instance at the site being onboarded. This is the raw inventory record with free-text manufacturer, model, and description fields. The ontology resolves each to a canonical Device (or marks it unmatched).',
         properties: [
-            { name: 'line1', description: 'ADDR_LINE1' },
-            { name: 'city', description: 'CITY' },
-            { name: 'state', description: 'STATE' },
-            { name: 'zip', description: 'ZIP' },
+            { name: 'equipId', description: 'Site-assigned equipment identifier' },
+            { name: 'rawMfr', description: 'Original manufacturer text (may be abbreviated or misspelled)' },
+            { name: 'rawModel', description: 'Original model text (may include brand name or just a number)' },
+            { name: 'rawDesc', description: 'Free-text description from site CMMS export' },
+            { name: 'isMatched', description: 'Whether this equipment was resolved to a canonical Device' },
+            { name: 'matchBasis', description: 'EXACT_MODEL / FUZZY_MODEL / DESC_MATCH' },
         ],
         mappings: [
-            { system: EMR_DB, table: 'PATIENT_MASTER', note: 'ADDR_LINE1, CITY, STATE, ZIP' },
+            { system: RX_DB, table: 'EQUIPMENT_LIST', note: 'EQUIP_ID + free-text MANUFACTURER / MODEL / DEVICE_DESCRIPTION' },
         ],
         sampleQuery:
-            'select MRN, ADDR_LINE1, CITY, STATE, ZIP from CLINICAL_EMR.EHR.PATIENT_MASTER limit 8',
+            `select EQUIP_ID, MANUFACTURER, MODEL, DEVICE_DESCRIPTION, SERIAL_NUMBER, CONDITION from ${RX_DB}.${RX_SCHEMA}.EQUIPMENT_LIST limit 8`,
     },
     {
-        id: 'Location',
-        label: 'Location',
+        id: 'ServiceCost',
+        label: 'Service Cost',
+        group: 'financial',
+        description:
+            'Annual service cost estimate for a specific device model. Includes parts, labor, PM, and total costs. This drives the site quote - wrong device matching means wrong cost assumptions.',
+        properties: [
+            { name: 'catalogId', description: 'Links to the Device this cost applies to' },
+            { name: 'annualPartsCost', description: 'Estimated annual parts spend' },
+            { name: 'annualLaborCost', description: 'Estimated annual labor cost' },
+            { name: 'annualTotalCost', description: 'Total annual service cost' },
+            { name: 'riskTier', description: 'HIGH / MEDIUM / LOW' },
+            { name: 'costConfidence', description: 'How reliable the estimate is' },
+        ],
+        mappings: [
+            { system: CLAIMS_DB, table: 'SERVICE_COST_ESTIMATE', note: 'CATALOG_ID + annual cost breakdown + risk tier' },
+        ],
+        sampleQuery:
+            `select CATALOG_ID, ANNUAL_PARTS_COST, ANNUAL_LABOR_COST, ANNUAL_TOTAL_COST, RISK_TIER from ${CLAIMS_DB}.${CLAIMS_SCHEMA}.SERVICE_COST_ESTIMATE limit 8`,
+    },
+    {
+        id: 'MaintenanceSchedule',
+        label: 'Maintenance Schedule',
+        group: 'operations',
+        description:
+            'Preventive maintenance template defining PM type (FULL_PM, INTERIM_PM, CALIBRATION, SAFETY_CHECK), interval in months, and estimated technician hours. Linked to DeviceFamily, not individual devices.',
+        properties: [
+            { name: 'pmId', description: 'PM schedule identifier' },
+            { name: 'pmType', description: 'FULL_PM / INTERIM_PM / CALIBRATION / SAFETY_CHECK' },
+            { name: 'intervalMonths', description: 'How often (months between PMs)' },
+            { name: 'estLaborHours', description: 'Estimated tech time per PM event' },
+        ],
+        mappings: [
+            { system: CLAIMS_DB, table: 'PM_SCHEDULE', note: 'PM_ID + FAMILY_ID + PM_TYPE + INTERVAL_MONTHS' },
+        ],
+        sampleQuery:
+            `select PM_ID, FAMILY_ID, PM_TYPE, INTERVAL_MONTHS, EST_LABOR_HOURS from ${CLAIMS_DB}.${CLAIMS_SCHEMA}.PM_SCHEDULE limit 8`,
+    },
+    {
+        id: 'FDARecord',
+        label: 'FDA Record',
+        group: 'regulatory',
+        description:
+            'An FDA GUDID registry entry. Contains the official device description, risk classification, and product code. Manufacturer names in FDA records are free-text and inconsistent even for the same company.',
+        properties: [
+            { name: 'gudidDi', description: 'Global Unique Device Identifier' },
+            { name: 'companyName', description: 'FDA free-text manufacturer (varies per record)' },
+            { name: 'brandName', description: 'Commercial brand name' },
+            { name: 'versionModelNumber', description: 'FDA model/version (may include revision suffixes)' },
+            { name: 'deviceClass', description: 'FDA risk class: 1, 2, or 3' },
+            { name: 'productCode', description: '3-letter FDA product code' },
+        ],
+        mappings: [
+            { system: EMR_DB, table: 'DEVICE_RECORD', note: 'GUDID_DI + COMPANY_NAME + VERSION_MODEL_NUMBER + DEVICE_DESCRIPTION' },
+        ],
+        sampleQuery:
+            `select GUDID_DI, COMPANY_NAME, BRAND_NAME, VERSION_MODEL_NUMBER, DEVICE_CLASS from ${EMR_DB}.${EMR_SCHEMA}.DEVICE_RECORD limit 8`,
+    },
+    {
+        id: 'Site',
+        label: 'Site',
         group: 'place',
         description:
-            'Where care is delivered. The EMR names it (DEPARTMENT); claims encode it as a numeric POS code (11 = Office). The ontology resolves POS → Location.',
+            'A hospital or facility being onboarded for device management. Contains bed count, location, and onboarding date.',
         properties: [
-            { name: 'name', description: 'Department / facility name' },
-            { name: 'facility', description: 'FACILITY_NAME' },
-            { name: 'posCode', description: 'Place-of-service code from claims' },
+            { name: 'siteId', description: 'Site identifier' },
+            { name: 'siteName', description: 'Hospital/facility name' },
+            { name: 'siteType', description: 'HOSPITAL / SURGERY_CENTER / CLINIC' },
+            { name: 'bedCount', description: 'Number of beds' },
         ],
         mappings: [
-            { system: EMR_DB, table: 'DEPARTMENT', note: 'named clinic + facility' },
-            { system: CLAIMS_DB, table: 'PLACE_OF_SERVICE', note: 'numeric POS code' },
-            { system: EMR_DB, table: 'VISIT', note: 'referenced — department of the encounter' },
+            { system: RX_DB, table: 'SITE_INFO', note: 'SITE_ID + SITE_NAME + BED_COUNT' },
         ],
         sampleQuery:
-            'select DEPT_ID, DEPT_NAME, FACILITY_NAME, CITY, STATE from CLINICAL_EMR.EHR.DEPARTMENT limit 8',
+            `select * from ${RX_DB}.${RX_SCHEMA}.SITE_INFO`,
     },
     {
-        id: 'Encounter',
-        label: 'Encounter',
-        group: 'clinical',
+        id: 'Department',
+        label: 'Department',
+        group: 'place',
         description:
-            'A clinical visit. The VISIT row is heavily overloaded — it also carries provider, department, the primary diagnosis, and vital-sign observations as wide columns.',
+            'A department or unit within the site (ICU, OR Suite, Radiology, etc.). Site naming conventions may differ from TriMedx standards.',
         properties: [
-            { name: 'encounterId', description: 'VISIT_ID' },
-            { name: 'date', description: 'VISIT_DATE' },
-            { name: 'type', description: 'VISIT_TYPE' },
-            { name: 'status', description: 'Encounter status (Completed) — not to be confused with other STATUS columns' },
+            { name: 'deptId', description: 'Department identifier' },
+            { name: 'deptName', description: 'Department name (site convention)' },
+            { name: 'floor', description: 'Floor number or label' },
+            { name: 'wing', description: 'Wing (East, West, North, South, Central)' },
         ],
         mappings: [
-            { system: EMR_DB, table: 'VISIT', note: 'Encounter + Provider + Location + Condition + Observation' },
-            { system: CLAIMS_DB, table: 'CLAIMS_LINE', note: 'aligned by patient + NPI + service date' },
+            { system: RX_DB, table: 'DEPARTMENT', note: 'DEPT_ID + DEPT_NAME + FLOOR + WING' },
         ],
         sampleQuery:
-            'select VISIT_ID, MRN, PHYSICIAN_ID, DEPT_ID, VISIT_DATE, VISIT_TYPE, PRIMARY_ICD10, STATUS from CLINICAL_EMR.EHR.VISIT limit 8',
-    },
-    {
-        id: 'Condition',
-        label: 'Condition',
-        group: 'clinical',
-        description:
-            'A diagnosis / problem. ICD-10 appears WITH decimals in the EMR (E11.9) and WITHOUT in claims (E119); the ontology canonicalizes so both match.',
-        properties: [
-            { name: 'icd10', description: 'Canonicalized ICD-10 code' },
-            { name: 'description', description: 'ICD10_DESC' },
-            { name: 'snomed', description: 'SNOMED_CODE (EMR only)' },
-            { name: 'status', description: 'Problem status (Active)' },
-        ],
-        mappings: [
-            { system: EMR_DB, table: 'PROBLEM_LIST', note: 'ICD-10 with decimal + SNOMED' },
-            { system: CLAIMS_DB, table: 'CLAIMS_LINE', note: 'ICD-10 without decimal' },
-            { system: EMR_DB, table: 'VISIT', note: 'referenced — primary dx of the encounter' },
-        ],
-        sampleQuery:
-            'select PROBLEM_ID, MRN, ICD10_CODE, ICD10_DESC, SNOMED_CODE, STATUS from CLINICAL_EMR.EHR.PROBLEM_LIST limit 8',
-    },
-    {
-        id: 'Observation',
-        label: 'Observation',
-        group: 'clinical',
-        description:
-            'A measurement (vital sign or lab). Stored WIDE — one column per analyte in LAB_RESULTS and per vital in VISIT. Each populated cell becomes one Observation node (unpivot).',
-        properties: [
-            { name: 'code', description: 'What was measured (e.g. HbA1c, LDL, systolic BP)' },
-            { name: 'value', description: 'Numeric result' },
-            { name: 'unit', description: 'Unit of measure' },
-            { name: 'date', description: 'Collection / visit date' },
-        ],
-        mappings: [
-            { system: EMR_DB, table: 'LAB_RESULTS', note: 'wide analyte columns' },
-            { system: EMR_DB, table: 'VISIT', note: 'wide vital-sign columns' },
-        ],
-        sampleQuery:
-            'select LAB_ID, MRN, COLLECT_DATE, GLUCOSE_MGDL, HBA1C_PCT, LDL_MGDL, CREATININE_MGDL, EGFR from CLINICAL_EMR.EHR.LAB_RESULTS limit 8',
-    },
-    {
-        id: 'Medication',
-        label: 'Medication',
-        group: 'medication',
-        description:
-            'A drug concept. EMR uses generic name + RxNorm; pharmacy uses brand + NDC. NDC_PRODUCT is the crosswalk that normalizes both to a canonical RxNorm concept — even when RxNorm is null.',
-        properties: [
-            { name: 'rxnorm', description: 'Canonical RxNorm concept' },
-            { name: 'ndc', description: 'NDC (pharmacy side)' },
-            { name: 'genericName', description: 'e.g. Atorvastatin 20 mg' },
-            { name: 'brandName', description: 'e.g. Lipitor 20mg' },
-        ],
-        mappings: [
-            { system: EMR_DB, table: 'MEDICATION', note: 'generic + RxNorm (nullable)' },
-            { system: RX_DB, table: 'NDC_PRODUCT', note: 'RxNorm ↔ NDC crosswalk + brand' },
-            { system: RX_DB, table: 'PHARMACY_FILL', note: 'referenced — dispensed product' },
-        ],
-        sampleQuery:
-            'select distinct DRUG_NAME, RXNORM_CODE from CLINICAL_EMR.EHR.MEDICATION order by DRUG_NAME limit 8',
-    },
-    {
-        id: 'MedicationRequest',
-        label: 'Medication Request',
-        group: 'medication',
-        description:
-            'A prescription order written by a practitioner. Extracted from the overloaded PHARMACY_FILL row (request + dispense + medication + patient + prescriber).',
-        properties: [
-            { name: 'orderId', description: 'MED_ORDER_ID' },
-            { name: 'orderDate', description: 'ORDER_DATE' },
-            { name: 'sig', description: 'Dosing instructions' },
-            { name: 'refills', description: 'Authorized refills' },
-        ],
-        mappings: [
-            { system: EMR_DB, table: 'MEDICATION', note: 'the order itself' },
-            { system: RX_DB, table: 'PHARMACY_FILL', note: 'MedicationRequest facet' },
-        ],
-        sampleQuery:
-            'select MED_ORDER_ID, MRN, PHYSICIAN_ID, ORDER_DATE, DRUG_NAME, SIG, REFILLS from CLINICAL_EMR.EHR.MEDICATION limit 8',
-    },
-    {
-        id: 'MedicationDispense',
-        label: 'Medication Dispense',
-        group: 'medication',
-        description:
-            'The actual fill / dispense event at the pharmacy. The path from an EMR order with a NULL RxNorm to the dispensed product runs through this node.',
-        properties: [
-            { name: 'fillStatus', description: 'Dispensed / Pending' },
-            { name: 'quantity', description: 'Quantity dispensed' },
-            { name: 'ndc', description: 'Product actually dispensed' },
-        ],
-        mappings: [
-            { system: RX_DB, table: 'PHARMACY_FILL', note: 'MedicationDispense facet' },
-        ],
-    },
-    {
-        id: 'Coverage',
-        label: 'Coverage',
-        group: 'financial',
-        description:
-            'Insurance coverage. Embedded inline in the EMR patient row (INS_*) and modeled explicitly in claims (plan / group). INS_MEMBER_ID is the strong link between EMR and claims.',
-        properties: [
-            { name: 'payer', description: 'INS_PAYER_NAME (e.g. Buckeye Health Plan)' },
-            { name: 'memberId', description: 'INS_MEMBER_ID == MEMBER.MEMBER_ID (strong key)' },
-            { name: 'group', description: 'INS_GROUP' },
-        ],
-        mappings: [
-            { system: EMR_DB, table: 'PATIENT_MASTER', note: 'INS_PAYER_NAME, INS_MEMBER_ID, INS_GROUP' },
-            { system: CLAIMS_DB, table: 'MEMBER', note: 'plan / group' },
-            { system: CLAIMS_DB, table: 'CLAIMS_LINE', note: 'referenced — coverage on the claim' },
-        ],
-        sampleQuery:
-            'select MRN, INS_PAYER_NAME, INS_MEMBER_ID, INS_GROUP from CLINICAL_EMR.EHR.PATIENT_MASTER limit 8',
-    },
-    {
-        id: 'Claim',
-        label: 'Claim',
-        group: 'financial',
-        description:
-            'A billing claim submitted to the payer. Decomposed from the overloaded CLAIMS_LINE row along with its lines, procedures, diagnoses, provider, and coverage.',
-        properties: [
-            { name: 'claimId', description: 'Claim identifier' },
-            { name: 'status', description: 'Adjudication status (Paid / Denied)' },
-            { name: 'serviceDate', description: 'Date of service' },
-        ],
-        mappings: [
-            { system: CLAIMS_DB, table: 'CLAIMS_LINE', note: 'Claim facet' },
-        ],
-    },
-    {
-        id: 'ClaimLine',
-        label: 'Claim Line',
-        group: 'financial',
-        description:
-            'A single line item on a claim: one procedure, its diagnosis pointer, charge, and adjudication result.',
-        properties: [
-            { name: 'lineNumber', description: 'Line sequence' },
-            { name: 'charge', description: 'Billed amount' },
-            { name: 'claimStatus', description: 'Line-level Paid / Denied' },
-        ],
-        mappings: [
-            { system: CLAIMS_DB, table: 'CLAIMS_LINE', note: 'ClaimLine facet' },
-        ],
-    },
-    {
-        id: 'Procedure',
-        label: 'Procedure',
-        group: 'financial',
-        description: 'A billed procedure (CPT / HCPCS) referenced by a claim line.',
-        properties: [
-            { name: 'cpt', description: 'CPT / HCPCS code' },
-            { name: 'description', description: 'Procedure description' },
-        ],
-        mappings: [
-            { system: CLAIMS_DB, table: 'CLAIMS_LINE', note: 'CPT / HCPCS' },
-        ],
+            `select * from ${RX_DB}.${RX_SCHEMA}.DEPARTMENT limit 8`,
     },
 ];
 
 const LINKS = [
-    { source: 'Patient', target: 'Coverage', label: 'has coverage' },
-    { source: 'Patient', target: 'Address', label: 'has address' },
-    { source: 'Patient', target: 'RelatedPerson', label: 'related to' },
-    { source: 'Patient', target: 'Encounter', label: 'subject of' },
-    { source: 'Patient', target: 'Claim', label: 'subject of' },
-    { source: 'Patient', target: 'MedicationRequest', label: 'subject of' },
-    { source: 'Encounter', target: 'Practitioner', label: 'performed by' },
-    { source: 'Encounter', target: 'Location', label: 'at' },
-    { source: 'Encounter', target: 'Condition', label: 'has diagnosis' },
-    { source: 'Encounter', target: 'Observation', label: 'has observation' },
-    { source: 'Claim', target: 'ClaimLine', label: 'has line' },
-    { source: 'ClaimLine', target: 'Procedure', label: 'has procedure' },
-    { source: 'ClaimLine', target: 'Condition', label: 'has diagnosis' },
-    { source: 'ClaimLine', target: 'Coverage', label: 'covered by' },
-    { source: 'ClaimLine', target: 'Practitioner', label: 'rendered by' },
-    { source: 'MedicationRequest', target: 'Practitioner', label: 'prescribed by' },
-    { source: 'MedicationRequest', target: 'Medication', label: 'of drug' },
-    { source: 'MedicationRequest', target: 'MedicationDispense', label: 'fulfilled by' },
-    { source: 'MedicationDispense', target: 'Medication', label: 'of drug' },
+    { source: 'Device', target: 'Manufacturer', label: 'made_by', description: 'Device is manufactured by' },
+    { source: 'Device', target: 'DeviceFamily', label: 'belongs_to_family', description: 'Device belongs to a logical family for pricing and PM' },
+    { source: 'Device', target: 'FDARecord', label: 'has_fda_record', description: 'Device links to its FDA GUDID registry entry' },
+    { source: 'Device', target: 'ServiceCost', label: 'has_cost', description: 'Device has an annual service cost estimate' },
+    { source: 'DeviceFamily', target: 'MaintenanceSchedule', label: 'has_pm_schedule', description: 'Family defines PM schedule templates' },
+    { source: 'SiteEquipment', target: 'Device', label: 'matched_to', description: 'Site inventory resolved to a canonical Device via degrading-hierarchy matching' },
+    { source: 'SiteEquipment', target: 'Department', label: 'located_in', description: 'Equipment is installed in this department' },
+    { source: 'Department', target: 'Site', label: 'part_of_site', description: 'Department belongs to the site' },
 ];
 
-/** Returns the ontology graph in the shape the frontend expects. */
 export function getOntology() {
     const nodes = NODES.map((n) => ({
         id: n.id,
@@ -333,7 +223,6 @@ export function getOntology() {
     return { nodes, links: LINKS, groups: GROUPS };
 }
 
-/** Returns full detail for a single class (used by the Inspector panel). */
 export function getNodeDetail(id) {
     const node = NODES.find((n) => n.id === id);
     if (!node) return null;
@@ -346,82 +235,70 @@ export function getNodeDetail(id) {
 }
 
 export function getNodeSampleQuery(id) {
-    return NODES.find((n) => n.id === id)?.sampleQuery?.replaceAll('CLINICAL_EMR.EHR.', `${EHR}.`) || null;
+    return NODES.find((n) => n.id === id)?.sampleQuery || null;
 }
 
 /* =========================================================================
-   Source-system model — the three ORIGINAL databases, for side-by-side
-   comparison against the ontology above.
+   Source-system model - the three ORIGINAL databases
    ========================================================================= */
 
 export const SOURCE_SYSTEMS = [
     {
         db: EMR_DB,
         schema: EMR_SCHEMA,
-        label: 'Clinical EMR',
-        color: '#29B5E8',
-        description: 'Electronic medical record. Calls a person a PATIENT (MRN) and a clinician a PHYSICIAN.',
+        label: 'FDA Device Registry',
+        color: '#2FA84F',
+        description: 'FDA GUDID registry. Manufacturer names are free-text and inconsistent across records.',
         tables: [
-            { name: 'PATIENT_MASTER', description: 'One row overloaded with Patient + Address + PCP + Coverage + next-of-kin.', overloaded: true },
-            { name: 'PHYSICIAN', description: 'Clinicians with a local id and NPI; free-text name "Sarah Chen, MD".' },
-            { name: 'DEPARTMENT', description: 'Named clinics / facilities.' },
-            { name: 'VISIT', description: 'Overloaded encounter: also carries provider, department, primary dx, and vitals as wide columns.', overloaded: true },
-            { name: 'PROBLEM_LIST', description: 'Diagnoses — ICD-10 WITH decimals, plus a SNOMED code.' },
-            { name: 'MEDICATION', description: 'Drug orders — generic name + RxNorm (sometimes NULL).' },
-            { name: 'LAB_RESULTS', description: 'Wide labs — one column per analyte; each cell is really an Observation.' },
+            { name: 'DEVICE_RECORD', description: 'One row per unique device identifier. COMPANY_NAME varies for the same manufacturer.' },
         ],
     },
     {
         db: CLAIMS_DB,
         schema: CLAIMS_SCHEMA,
-        label: 'Payer Claims',
-        color: '#F59F3B',
-        description: 'Health plan / claims. Calls a person a MEMBER / SUBSCRIBER and a clinician a RENDERING_PROVIDER.',
+        label: 'TriMedx Master MMD',
+        color: '#29B5E8',
+        description: 'TriMedx proprietary catalog. Abbreviated manufacturer names (GE, Phil, Siemens).',
         tables: [
-            { name: 'MEMBER', description: 'Members / subscribers and their plan + group (coverage).' },
-            { name: 'RENDERING_PROVIDER', description: 'Providers keyed on NPI; name as "CHEN, SARAH" (apostrophes dropped).' },
-            { name: 'PLACE_OF_SERVICE', description: 'Numeric POS codes (11 = Office) — the claims notion of Location.' },
-            { name: 'CLAIMS_LINE', description: 'Overloaded: Claim + ClaimLine + Procedure + Diagnosis + Provider + Coverage + Member.', overloaded: true },
+            { name: 'MANUFACTURER', description: 'Canonical manufacturer list with TriMedx-internal abbreviations.' },
+            { name: 'DEVICE_CATALOG', description: 'The master MMD table - Make, Model, Description for every known device.' },
+            { name: 'DEVICE_FAMILY', description: 'Logical device groupings for pricing and PM scheduling.' },
+            { name: 'PM_SCHEDULE', description: 'Preventive maintenance templates by device family.' },
+            { name: 'SERVICE_COST_ESTIMATE', description: 'Annual service cost per device model - drives the quote.' },
         ],
     },
     {
         db: RX_DB,
         schema: RX_SCHEMA,
-        label: 'Pharmacy Ops',
-        color: '#2FA84F',
-        description: 'Pharmacy / dispensing. Calls a person a SUBSCRIBER (Rx member) and a clinician a PRESCRIBER.',
+        label: 'Incoming Site Inventory',
+        color: '#F59F3B',
+        description: 'Raw equipment inventory from the site being onboarded. Free-text, wildly inconsistent.',
         tables: [
-            { name: 'SUBSCRIBER', description: 'Rx members stored under nicknames (Bob, Jim, Beth…); SSN null for some.' },
-            { name: 'PRESCRIBER', description: 'Prescribers with a compact name "S CHEN"; id equals the NPI.' },
-            { name: 'NDC_PRODUCT', description: 'The RxNorm ↔ NDC crosswalk + brand names.' },
-            { name: 'PHARMACY_FILL', description: 'Overloaded: MedicationRequest + MedicationDispense + Medication + Patient + Prescriber.', overloaded: true },
+            { name: 'SITE_INFO', description: 'The hospital being onboarded.' },
+            { name: 'DEPARTMENT', description: 'Departments within the site.' },
+            { name: 'EQUIPMENT_LIST', description: 'Overloaded: device + location + service history in one row. Manufacturer and model are free-text.', overloaded: true },
         ],
     },
 ];
 
-/** Colour + label for each kind of cross-system linkage key. */
 export const LINKAGE_KINDS = {
-    patient: { label: 'Patient id (system-local)', color: '#8595a6' },
-    person: { label: 'SSN — person link (medium)', color: '#7442BF' },
-    coverage: { label: 'Member id — EMR↔claims (strong)', color: '#F59F3B' },
-    provider: { label: 'NPI — provider link (universal)', color: '#11567F' },
-    drug: { label: 'RxNorm / NDC — drug crosswalk', color: '#2FA84F' },
+    device_id: { label: 'FDA DI - device identity (strong)', color: '#2FA84F' },
+    manufacturer: { label: 'Manufacturer name - alias resolution', color: '#29B5E8' },
+    model: { label: 'Model number - fuzzy match', color: '#7442BF' },
+    family: { label: 'Device family - grouping key', color: '#F59F3B' },
+    catalog: { label: 'Catalog ID - TriMedx internal', color: '#11567F' },
 };
 
-/** Tags a column as a cross-system linkage key (or null). */
 export function classifyColumn(name) {
     const u = String(name).toUpperCase();
-    if (u.includes('SSN')) return { kind: 'person', label: 'SSN · person link across all 3 systems (null for some)' };
-    if (u.includes('NPI') || u === 'PRESCRIBER_ID') return { kind: 'provider', label: 'NPI · universal provider key' };
-    if (u === 'INS_MEMBER_ID' || u === 'MEMBER_ID') return { kind: 'coverage', label: 'Member id · strong EMR↔claims link' };
-    if (u === 'RX_MEMBER_ID') return { kind: 'coverage', label: 'Rx member id · NOT the claims member id' };
-    if (u.includes('RXNORM')) return { kind: 'drug', label: 'RxNorm · drug crosswalk key' };
-    if (u.includes('NDC')) return { kind: 'drug', label: 'NDC · drug crosswalk key' };
-    if (u === 'MRN') return { kind: 'patient', label: 'MRN · EMR patient id' };
+    if (u.includes('GUDID') || u === 'FDA_DI') return { kind: 'device_id', label: 'FDA GUDID - strong device identity link' };
+    if (u.includes('MFR') || u === 'MANUFACTURER' || u === 'COMPANY_NAME') return { kind: 'manufacturer', label: 'Manufacturer name - needs alias resolution' };
+    if (u.includes('MODEL') || u === 'VERSION_MODEL_NUMBER') return { kind: 'model', label: 'Model number - fuzzy match across systems' };
+    if (u.includes('FAMILY_ID')) return { kind: 'family', label: 'Device family - TriMedx grouping key' };
+    if (u === 'CATALOG_ID') return { kind: 'catalog', label: 'TriMedx catalog ID - canonical device key' };
     return null;
 }
 
-/** Ontology classes that a given source table decomposes into. */
 function classesForTable(systemDb, tableName) {
     return NODES.filter((n) =>
         n.mappings.some(
@@ -432,7 +309,6 @@ function classesForTable(systemDb, tableName) {
     ).map((n) => ({ id: n.id, label: n.label, color: GROUPS[n.group]?.color }));
 }
 
-/** The source model with each table annotated with the ontology classes it maps to. */
 export function getSourceModel() {
     return SOURCE_SYSTEMS.map((sys) => ({
         ...sys,
@@ -443,49 +319,22 @@ export function getSourceModel() {
     }));
 }
 
-/**
- * Layer-2 ontology metadata objects (all in CLINICAL_EMR.ONTOLOGY), grouped into
- * lanes by purpose. These are the tables that DEFINE the ontology.
- */
 export const ONTOLOGY_METADATA = [
     {
-        db: ONTOLOGY_DB, schema: ONTOLOGY_SCHEMA, label: 'Classes & properties', color: '#8b5cf6',
-        description: 'The class hierarchy and the attributes each class carries.',
+        db: ONTOLOGY_DB, schema: ONTOLOGY_SCHEMA, label: 'Classes & relations', color: '#8b5cf6',
+        description: 'The class hierarchy and relationship definitions.',
         tables: [
-            { name: 'ONT_CLASS', description: 'Every ontology class + its parent (the type hierarchy).' },
-            { name: 'ONT_PROPERTY', description: 'Scalar attributes declared on a class.' },
-            { name: 'ONT_SHARED_PROPERTY', description: 'Properties shared across multiple classes.' },
-            { name: 'ONT_DERIVED_PROPERTY', description: 'Computed / derived attributes.' },
-        ],
-    },
-    {
-        db: ONTOLOGY_DB, schema: ONTOLOGY_SCHEMA, label: 'Relations & mappings', color: '#7c3aed',
-        description: 'How classes relate, and how each maps back to source tables.',
-        tables: [
-            { name: 'ONT_RELATION_DEF', description: 'Typed relationships between classes (treated, prescribed…).' },
-            { name: 'ONT_REL_MAP', description: 'Maps a relation to the source join that populates it.' },
-            { name: 'ONT_CLASS_MAP', description: 'Maps a class to its backing source object(s).' },
-            { name: 'ONT_LINK_SOURCE', description: 'Source columns that link entities across systems.' },
+            { name: 'ONT_CLASS', description: 'Every ontology class + its parent.' },
+            { name: 'ONT_RELATION_DEF', description: 'Typed relationships between classes.' },
+            { name: 'ONT_CLASS_MAP', description: 'Maps source labels to ontology classes.' },
         ],
     },
     {
         db: ONTOLOGY_DB, schema: ONTOLOGY_SCHEMA, label: 'Sources & identity', color: '#a855f7',
-        description: 'Provenance + the rules that resolve one entity across systems.',
+        description: 'Provenance + the rules that resolve one device across systems.',
         tables: [
             { name: 'ONT_OBJECT_SOURCE', description: 'Which source table/column each class draws from.' },
-            { name: 'ONT_IDENTITY_RULE', description: 'Entity-resolution rules (NPI, member id, SSN→DOB…).' },
-            { name: 'ONT_RULE', description: 'Declarative constraints / logic rules.' },
-            { name: 'ONT_CONSTRAINT_VIOLATION', description: 'Rows that violated an ontology constraint.' },
-        ],
-    },
-    {
-        db: ONTOLOGY_DB, schema: ONTOLOGY_SCHEMA, label: 'View & action defs', color: '#6d5bd0',
-        description: 'The specs the generator reads to emit Layer-3 views.',
-        tables: [
-            { name: 'OBJ_VIEW_DEF', description: 'Definition of each generated view.' },
-            { name: 'OBJ_VIEW_FIELD', description: 'Column-level spec for each generated view.' },
-            { name: 'ACT_DEF', description: 'Action / function definitions.' },
-            { name: 'ACT_TYPE', description: 'Action type catalog.' },
+            { name: 'ONT_IDENTITY_RULE', description: 'Device resolution rules (FDA_DI, model match, desc match).' },
         ],
     },
     {
@@ -494,37 +343,38 @@ export const ONTOLOGY_METADATA = [
         tables: [
             { name: 'KG_NODE', description: 'Canonical resolved entities (one row per real-world thing).' },
             { name: 'KG_EDGE', description: 'Typed relationships between canonical nodes.' },
-            { name: 'REL_EDGE_INFERRED', description: 'Edges inferred by resolution rules.' },
         ],
     },
 ];
 
-/** Layer-3 generated views (CLINICAL_EMR.ONTOLOGY), grouped by kind. */
 export const GENERATED_VIEWS = [
     {
         db: ONTOLOGY_DB, schema: ONTOLOGY_SCHEMA, label: 'Entity views', color: '#29b5e8',
         description: 'One resolved view per ontology class.',
         tables: [
-            { name: 'V_PATIENT', description: 'Canonical patients (one row per person across systems).' },
-            { name: 'V_PRACTITIONER', description: 'Canonical clinicians keyed by NPI.' },
-            { name: 'V_ENCOUNTER', description: 'Resolved clinical encounters.' },
-            { name: 'V_MEDICATION', description: 'Canonical drugs keyed by RxNorm.' },
-            { name: 'V_CONDITION', description: 'Diagnoses on canonical (dotted) ICD-10.' },
-            { name: 'V_CLAIM', description: 'Resolved claims.' },
-            { name: 'V_COVERAGE', description: 'Coverage / plan membership.' },
-            { name: 'V_PROCEDURE', description: 'Procedures keyed by CPT.' },
+            { name: 'V_DEVICE', description: 'Canonical devices resolved across all three systems.' },
+            { name: 'V_MANUFACTURER', description: 'Canonical manufacturers with all name variants.' },
+            { name: 'V_DEVICE_FAMILY', description: 'Device families for pricing and PM.' },
+            { name: 'V_SITE_EQUIPMENT', description: 'Site inventory with match status.' },
+            { name: 'V_SERVICE_COST', description: 'Annual cost estimates per device.' },
+            { name: 'V_MAINTENANCE_SCHEDULE', description: 'PM schedule templates.' },
+            { name: 'V_FDA_RECORD', description: 'FDA GUDID records.' },
+            { name: 'V_SITE', description: 'Hospital sites.' },
+            { name: 'V_DEPARTMENT', description: 'Departments within sites.' },
         ],
     },
     {
         db: ONTOLOGY_DB, schema: ONTOLOGY_SCHEMA, label: 'Relationship views', color: '#1e9fd0',
         description: 'Resolved edges between entities.',
         tables: [
-            { name: 'V_ENCOUNTER_PERFORMED_BY', description: 'Encounter → Practitioner.' },
-            { name: 'V_ENCOUNTER_OF_PATIENT', description: 'Encounter → Patient.' },
-            { name: 'V_PATIENT_HAS_CONDITION', description: 'Patient → Condition.' },
-            { name: 'V_MEDREQUEST_FOR_MEDICATION', description: 'MedicationRequest → Medication.' },
-            { name: 'V_DISPENSE_OF_MEDICATION', description: 'MedicationDispense → Medication.' },
-            { name: 'V_CLAIM_RENDERED_BY', description: 'Claim → rendering Practitioner.' },
+            { name: 'V_REL_MADE_BY', description: 'Device manufactured by Manufacturer.' },
+            { name: 'V_REL_BELONGS_TO_FAMILY', description: 'Device belongs to DeviceFamily.' },
+            { name: 'V_REL_HAS_COST', description: 'Device has ServiceCost.' },
+            { name: 'V_REL_HAS_FDA_RECORD', description: 'Device links to FDARecord.' },
+            { name: 'V_REL_HAS_PM', description: 'DeviceFamily has MaintenanceSchedule.' },
+            { name: 'V_REL_MATCHED_TO', description: 'SiteEquipment matched to Device.' },
+            { name: 'V_REL_LOCATED_IN', description: 'SiteEquipment in Department.' },
+            { name: 'V_REL_PART_OF_SITE', description: 'Department belongs to Site.' },
         ],
     },
     {
@@ -533,27 +383,25 @@ export const GENERATED_VIEWS = [
         tables: [
             { name: 'VW_ONT_ALL_ENTITIES', description: 'All resolved entities across every class.' },
             { name: 'REL_RESOLVED', description: 'All resolved edges (src/dst joined to entities).' },
-            { name: 'VW_ONT_HIERARCHY_STATS', description: 'Per-class instance + relationship counts.' },
-            { name: 'VW_ANCESTORS', description: 'Transitive superclasses of each class.' },
-            { name: 'VW_DESCENDANTS', description: 'Transitive subclasses of each class.' },
+            { name: 'VW_ONT_HIERARCHY_STATS', description: 'Per-class instance counts.' },
+            { name: 'VW_MATCH_SUMMARY', description: 'Match rate and cost summary for the site.' },
+            { name: 'VW_SITE_COST_ESTIMATE', description: 'Per-device cost estimate with match status.' },
         ],
     },
 ];
-
-/** All three selectable datasets for the Source Data page. */
-export function getSourceDatasets() {
-    return [
-        { key: 'raw', label: 'Raw tables', description: 'The three original source databases, exactly as each stores its data.', systems: getSourceModel() },
-        { key: 'metadata', label: 'Ontology metadata', description: 'The metadata tables that DEFINE the ontology — classes, relations, identity rules, view specs.', systems: withEmptyClasses(ONTOLOGY_METADATA) },
-        { key: 'views', label: 'Generated views', description: 'The views the ontology generates from its metadata — resolved entities and relationships.', systems: withEmptyClasses(GENERATED_VIEWS) },
-    ];
-}
 
 function withEmptyClasses(model) {
     return model.map((s) => ({ ...s, tables: s.tables.map((t) => ({ ...t, classes: [] })) }));
 }
 
-/** True if db.schema.table is one of the objects we expose (guards ad-hoc sampling). */
+export function getSourceDatasets() {
+    return [
+        { key: 'raw', label: 'Raw tables', description: 'The three original source databases, exactly as each stores its data.', systems: getSourceModel() },
+        { key: 'metadata', label: 'Ontology metadata', description: 'The metadata tables that DEFINE the ontology - classes, relations, identity rules.', systems: withEmptyClasses(ONTOLOGY_METADATA) },
+        { key: 'views', label: 'Generated views', description: 'The views the ontology generates - resolved entities and relationships.', systems: withEmptyClasses(GENERATED_VIEWS) },
+    ];
+}
+
 export function isKnownObject(db, schema, table) {
     const all = [SOURCE_SYSTEMS, ONTOLOGY_METADATA, GENERATED_VIEWS].flat();
     return all.some(
@@ -561,17 +409,14 @@ export function isKnownObject(db, schema, table) {
     );
 }
 
-
-/** Alignment challenges (condensed from README) for the overview dashboard. */
 export const CHALLENGES = [
-    { id: 1, title: 'Overloaded tables', blurb: 'One table smears across many classes — PATIENT_MASTER→5, VISIT→5, CLAIMS_LINE→7, PHARMACY_FILL→5. The ontology decomposes each row into clean class instances.' },
-    { id: 2, title: 'Same entity, different names', blurb: 'Patient = MEMBER = SUBSCRIBER; Practitioner = RENDERING_PROVIDER = PRESCRIBER. One canonical class collapses the synonyms.' },
-    { id: 3, title: 'Identity with imperfect keys', blurb: 'No single patient key: SSN is null for some, pharmacy uses nicknames, and RX_MEMBER_ID ≠ claims MEMBER_ID. Resolve from a hierarchy of keys.' },
-    { id: 4, title: 'Provider name formats', blurb: '"Sarah Chen, MD" vs "CHEN, SARAH" vs "S CHEN". NPI is the one universal key; the varied names become attributes.' },
-    { id: 5, title: 'Drug identity via crosswalk', blurb: 'EMR uses generic + RxNorm; pharmacy uses brand + NDC. NDC_PRODUCT stitches them — even when RxNorm is NULL.' },
-    { id: 6, title: 'Divergent conventions', blurb: 'ICD-10 with vs without the decimal (E11.9 / E119), sex M/F vs 1/2, named department vs numeric POS. Canonicalize so filters match.' },
-    { id: 7, title: 'Overloaded column names', blurb: 'STATUS means problem status, encounter status, adjudication, or dispense status depending on the table — a trap for keyword agents.' },
-    { id: 8, title: 'Different grain (wide vs long)', blurb: 'Wide LAB_RESULTS / VISIT columns become individual Observation nodes with a common (code, value, unit, date) shape.' },
+    { id: 1, title: 'Same device, different names', blurb: '"GE Carescape B650" (TriMedx) vs "GE Healthcare CARESCAPE Monitor B650" (FDA) vs "GE B650" (site). The ontology resolves them to one canonical Device.' },
+    { id: 2, title: 'Manufacturer alias chaos', blurb: '"GE Healthcare", "General Electric Co", "GE Medical Systems", "GE", "G.E.", "Gen Electric", "GE Med Sys" - all the same company. FN_NORMALIZE_MFR resolves them.' },
+    { id: 3, title: 'Missing identity keys', blurb: 'Not every device has an FDA DI. Some site entries lack model numbers. The matcher degrades gracefully: exact model, fuzzy model, description match.' },
+    { id: 4, title: 'Acquisition name changes', blurb: '"Toshiba" is now Canon Medical. "Covidien" is now Medtronic. "CareFusion" is now BD. "Maquet" is now Getinge. The ontology maps legacy names.' },
+    { id: 5, title: 'Model number formatting', blurb: 'FDA includes revision suffixes (B650 v2, A500 SW 3.0). TriMedx uses short codes (B650, A500). Site uses whatever the tech typed. FN_NORMALIZE_MODEL strips the noise.' },
+    { id: 6, title: 'Overloaded inventory rows', blurb: 'Each EQUIPMENT_LIST row is a device + location + service history + condition. The ontology decomposes it into SiteEquipment + Department + Device links.' },
+    { id: 7, title: 'Unmatched devices = unpriced risk', blurb: 'Every device that fails matching has no cost estimate. The quote underestimates the fleet. The ontology quantifies this gap explicitly.' },
 ];
 
 export function getOverview() {

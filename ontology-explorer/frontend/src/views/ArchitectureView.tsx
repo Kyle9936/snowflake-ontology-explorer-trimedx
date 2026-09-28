@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
  * through the ontology (metadata + generated views) into semantic models and,
  * finally, the agent + its knowledge-graph tools on the right.
  *
- * Object names are the real deployed objects in CLINICAL_EMR.ONTOLOGY (+ the
+ * Object names are the real deployed objects in FDA_DEVICES.ONTOLOGY (+ the
  * three source databases).
  */
 
@@ -113,9 +113,9 @@ export default function ArchitectureView() {
                 <div className="arch-group-title">Raw source tables</div>
                 <Cards
                   items={[
-                    { name: 'PATIENT_MASTER', sub: 'VISIT · MEDICATION · PROBLEM_LIST', tag: 'EMR' },
-                    { name: 'MEMBER', sub: 'CLAIMS_LINE · RENDERING_PROVIDER', tag: 'Claims' },
-                    { name: 'SUBSCRIBER', sub: 'PHARMACY_FILL · NDC_PRODUCT', tag: 'Pharmacy' },
+                    { name: 'DEVICE_RECORD', sub: 'GUDID registry entries', tag: 'FDA' },
+                    { name: 'DEVICE_CATALOG', sub: 'MANUFACTURER · DEVICE_FAMILY · PM_SCHEDULE', tag: 'TriMedx' },
+                    { name: 'EQUIPMENT_LIST', sub: 'SITE_INFO · DEPARTMENT', tag: 'Site' },
                   ]}
                 />
               </div>
@@ -147,7 +147,7 @@ export default function ArchitectureView() {
                     { name: 'ONT_RELATION_DEF', sub: 'relationships' },
                     { name: 'ONT_OBJECT_SOURCE', sub: 'class → source table' },
                     { name: 'ONT_IDENTITY_RULE', sub: 'entity resolution' },
-                    { name: 'OBJ_VIEW_DEF', sub: 'view generation spec' },
+                    { name: 'ONT_CLASS_MAP', sub: 'source → class mapping' },
                   ]}
                 />
               </LayerCol>
@@ -158,18 +158,18 @@ export default function ArchitectureView() {
                 <div className="arch-subhead">Entities</div>
                 <Cards
                   items={[
-                    { name: 'V_PATIENT' },
-                    { name: 'V_PRACTITIONER' },
-                    { name: 'V_ENCOUNTER' },
-                    { name: 'V_MEDICATION' },
+                    { name: 'V_DEVICE' },
+                    { name: 'V_MANUFACTURER' },
+                    { name: 'V_SITE_EQUIPMENT' },
+                    { name: 'V_SERVICE_COST' },
                   ]}
                 />
                 <div className="arch-subhead">Relationships</div>
                 <Cards
                   items={[
-                    { name: 'V_ENCOUNTER_PERFORMED_BY' },
-                    { name: 'V_PATIENT_HAS_CONDITION' },
-                    { name: 'V_DISPENSE_OF_MEDICATION' },
+                    { name: 'V_REL_MADE_BY' },
+                    { name: 'V_REL_MATCHED_TO' },
+                    { name: 'V_REL_HAS_COST' },
                   ]}
                 />
                 <div className="arch-subhead">Resolved graph</div>
@@ -189,10 +189,10 @@ export default function ArchitectureView() {
           <LayerCol cls="l4 arch-l4" n="Layer 4" title="Semantic Models">
             <Cards
               items={[
-                { name: 'Base', sub: 'HEALTHCARE_ONTOLOGY_BASE', tag: 'raw' },
-                { name: 'Ontology', sub: 'HEALTHCARE_ONTOLOGY_ONTOLOGY_MODEL', tag: 'resolved' },
-                { name: 'Governance', sub: 'HEALTHCARE_ONTOLOGY_METADATA_MODEL', tag: 'metadata' },
-                { name: 'Knowledge Graph', sub: 'HEALTHCARE_ONTOLOGY_KG_MODEL', tag: 'star' },
+                { name: 'Base', sub: 'MMD_ONTOLOGY_BASE', tag: 'raw' },
+                { name: 'Ontology', sub: 'MMD_ONTOLOGY_ONTOLOGY_MODEL', tag: 'resolved' },
+                { name: 'Governance', sub: 'MMD_ONTOLOGY_METADATA_MODEL', tag: 'metadata' },
+                { name: 'Knowledge Graph', sub: 'MMD_ONTOLOGY_KG_MODEL', tag: 'star' },
               ]}
             />
           </LayerCol>
@@ -204,7 +204,7 @@ export default function ArchitectureView() {
             <div className="arch-agent">
               <div className="arch-agent-icon">✦</div>
               <div>
-                <div className="arch-agent-name">HEALTHCARE_ONTOLOGY_AGENT</div>
+                <div className="arch-agent-name">MMD_ONTOLOGY_AGENT</div>
                 <div className="arch-agent-sub">Cortex Agent · plans &amp; routes</div>
               </div>
             </div>

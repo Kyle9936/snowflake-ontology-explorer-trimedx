@@ -16,9 +16,9 @@ interface UiMessage extends ChatMessage {
 }
 
 const SUGGESTIONS = [
-    'How many distinct patients did Dr. Chen treat, and what were they prescribed?',
-    'Which patients are on Atorvastatin across the EMR and pharmacy systems?',
-    'Show diabetic patients (E11.9) with their most recent HbA1c.',
+    'What is the estimated annual maintenance cost for this site\'s device fleet?',
+    'What is the current match rate for the site inventory?',
+    'Show me all the name variants that resolved to GE Healthcare.',
 ];
 
 const AGENTS = [
@@ -208,7 +208,7 @@ export default function ChatPanel() {
                 <textarea
                     ref={taRef}
                     value={input}
-                    placeholder="Ask about patients, providers, medications…"
+                    placeholder="Ask about devices, manufacturers, fleet costs..."
                     rows={1}
                     onChange={(e) => {
                         setInput(e.target.value);

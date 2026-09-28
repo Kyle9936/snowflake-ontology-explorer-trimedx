@@ -14,12 +14,12 @@ export default function OverviewView({ onOpen }: { onOpen: (v: View) => void }) 
   return (
     <div className="overview">
       <div className="hero">
-        <div className="hero-eyebrow">Healthcare data · ontology alignment demo</div>
-        <h1>A unified ontology for healthcare data.</h1>
+        <div className="hero-eyebrow">Medical device data · MMD ontology alignment demo</div>
+        <h1>A unified ontology for medical device fleet management.</h1>
         <p>
-          Three independent source systems describe the same patients, providers, and drugs in
-          incompatible ways. Explore how a Snowflake ontology layer aligns them into one connected,
-          queryable graph — then ask questions in plain language.
+          Three independent source systems describe the same devices, manufacturers, and models in
+          incompatible ways. Explore how a Snowflake ontology layer resolves them into one connected,
+          queryable graph - then ask questions in plain language.
         </p>
         <div className="hero-actions">
           <button className="btn primary" onClick={() => onOpen('ontology')}>
@@ -49,7 +49,7 @@ export default function OverviewView({ onOpen }: { onOpen: (v: View) => void }) 
           </div>
           <div>
             <h3>The raw source data</h3>
-            <p>Overloaded tables, clashing names and codes — exactly as the three systems store it.</p>
+            <p>Inconsistent manufacturer names, mismatched model numbers, free-text descriptions - exactly as the three systems store it.</p>
           </div>
         </button>
         <div className="split-connector">
@@ -66,7 +66,7 @@ export default function OverviewView({ onOpen }: { onOpen: (v: View) => void }) 
           </div>
           <div>
             <h3>The unified ontology</h3>
-            <p>One canonical model — Patient, Practitioner, Encounter, Medication — connected end to end.</p>
+            <p>One canonical model - Device, Manufacturer, DeviceFamily, ServiceCost - connected end to end.</p>
           </div>
         </button>
       </div>
