@@ -35,7 +35,10 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_KG_MODEL
       COMMENT = 'Hospital site being onboarded.',
     department AS FDA_DEVICES.ONTOLOGY.V_DEPARTMENT
       PRIMARY KEY (NODE_ID)
-      COMMENT = 'Department within the site.'
+      COMMENT = 'Department within the site.',
+    site_fleet AS FDA_DEVICES.ONTOLOGY.VW_SITE_COST_ESTIMATE
+      PRIMARY KEY (EQUIP_ID)
+      COMMENT = 'One row per physical device at the site being onboarded (decommissioned excluded), with its resolved canonical device, annual cost, and match status. Use for fleet cost, match rate, department, and unmatched-device questions.'
   )
 
   RELATIONSHIPS (
@@ -51,11 +54,15 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_KG_MODEL
   FACTS (
     service_cost.annual_parts_cost AS annual_parts_cost COMMENT = 'Annual parts cost per device',
     service_cost.annual_labor_cost AS annual_labor_cost COMMENT = 'Annual labor cost per device',
-    service_cost.annual_pm_cost AS annual_pm_cost COMMENT = 'Annual PM cost per device',
-    service_cost.annual_total_cost AS annual_total_cost COMMENT = 'Total annual service cost per device',
+    service_cost.annual_pm_cost AS annual_pm_cost COMMENT = 'Preventive-maintenance portion of annual LABOR cost. Already included in annual_labor_cost; never add it to parts + labor.',
+    service_cost.annual_total_cost AS annual_total_cost COMMENT = 'Total annual service cost per device = annual_parts_cost + annual_labor_cost (PM is inside labor).',
     maintenance.interval_months AS interval_months COMMENT = 'Months between PMs',
     maintenance.est_labor_hours AS est_labor_hours COMMENT = 'Estimated tech hours per PM',
-    manufacturer.device_count AS device_count COMMENT = 'Number of device models from this manufacturer'
+    manufacturer.device_count AS device_count COMMENT = 'Number of device models from this manufacturer',
+    site_fleet.fleet_annual_cost AS annual_total_cost COMMENT = 'Annual service cost for this physical device (NULL when unmatched)',
+    site_fleet.fleet_parts_cost AS annual_parts_cost COMMENT = 'Annual parts cost for this physical device',
+    site_fleet.fleet_labor_cost AS annual_labor_cost COMMENT = 'Annual labor cost for this physical device',
+    site_fleet.fleet_search_score AS search_score COMMENT = 'Cortex Search cosine similarity of the top catalog candidate (0-1)'
   )
 
   DIMENSIONS (
@@ -76,7 +83,7 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_KG_MODEL
     site_equipment.raw_mfr AS raw_mfr COMMENT = 'Original manufacturer text from site',
     site_equipment.raw_model AS raw_model COMMENT = 'Original model text from site',
     site_equipment.raw_desc AS raw_desc COMMENT = 'Original description from site',
-    site_equipment.match_basis AS match_basis WITH SYNONYMS = ('match type', 'how matched') COMMENT = 'EXACT_MODEL, FUZZY_MODEL, or DESC_MATCH',
+    site_equipment.match_basis AS match_basis WITH SYNONYMS = ('match type', 'how matched') COMMENT = 'EXACT_MODEL or FUZZY_MODEL (rules), SEARCH_MATCH (confident Cortex Search), or NEEDS_REVIEW',
     site_equipment.is_matched AS is_matched WITH SYNONYMS = ('matched', 'resolved') COMMENT = 'Whether equipment was matched to a canonical device',
     site_equipment.condition AS condition COMMENT = 'GOOD, FAIR, POOR, or UNKNOWN',
 
@@ -84,13 +91,32 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_KG_MODEL
     service_cost.cost_confidence AS cost_confidence COMMENT = 'Confidence in the cost estimate',
 
     site.site_name AS site_name WITH SYNONYMS = ('hospital', 'facility') COMMENT = 'Hospital name',
-    department.dept_name AS dept_name WITH SYNONYMS = ('department', 'unit') COMMENT = 'Department name'
+    department.dept_name AS dept_name WITH SYNONYMS = ('department', 'unit') COMMENT = 'Department name',
+
+    site_fleet.fleet_equip_id AS equip_id COMMENT = 'Site equipment identifier',
+    site_fleet.fleet_raw_mfr AS raw_mfr COMMENT = 'Manufacturer as written in the site inventory',
+    site_fleet.fleet_raw_model AS raw_model COMMENT = 'Model as written in the site inventory',
+    site_fleet.fleet_raw_desc AS raw_desc COMMENT = 'Description as written in the site inventory',
+    site_fleet.fleet_dept_name AS dept_name COMMENT = 'Department where the device is installed',
+    site_fleet.fleet_matched_device AS matched_device COMMENT = 'Canonical device the site record resolved to',
+    site_fleet.fleet_matched_mfr AS matched_mfr COMMENT = 'Canonical manufacturer the site record resolved to',
+    site_fleet.fleet_family_name AS family_name COMMENT = 'Device family of the resolved device',
+    site_fleet.fleet_risk_tier AS risk_tier COMMENT = 'HIGH, MEDIUM, or LOW',
+    site_fleet.fleet_match_basis AS match_basis COMMENT = 'EXACT_MODEL or FUZZY_MODEL (deterministic rules), SEARCH_MATCH (confident Cortex Search match), or NEEDS_REVIEW (sent to a human)',
+    site_fleet.fleet_suggested_device AS suggested_device COMMENT = 'Top Cortex Search candidate from the TriMedx catalog. For NEEDS_REVIEW rows this pre-fills the reviewer',
+    site_fleet.fleet_search_agrees AS search_agrees WITH SYNONYMS = ('independently confirmed', 'double checked') COMMENT = 'TRUE when Cortex Search independently picked the same device the rules matched',
+    site_fleet.fleet_is_matched AS is_matched COMMENT = 'TRUE when the device resolved to a canonical device and has a cost estimate'
   )
 
   METRICS (
-    total_fleet_cost AS SUM(service_cost.annual_total_cost)
-      WITH SYNONYMS = ('fleet cost', 'annual fleet cost', 'total annual cost', 'site cost estimate', 'maintenance cost')
-      COMMENT = 'Total annual service cost for the fleet',
+    site_fleet.site_annual_cost AS SUM(site_fleet.fleet_annual_cost)
+      WITH SYNONYMS = ('fleet cost', 'annual fleet cost', 'total annual cost', 'site cost estimate', 'maintenance cost', 'quote')
+      COMMENT = 'Estimated annual service cost for the site fleet: sum over every matched physical device',
+    site_fleet.site_device_count AS COUNT(site_fleet.fleet_equip_id)
+      WITH SYNONYMS = ('fleet size', 'number of devices at the site')
+      COMMENT = 'Number of active physical devices at the site',
+    catalog_model_cost AS SUM(service_cost.annual_total_cost)
+      COMMENT = 'Sum of per-model catalog costs (one row per catalog model, not per physical device). Not a fleet cost.',
     total_parts_cost AS SUM(service_cost.annual_parts_cost) COMMENT = 'Total annual parts spend',
     total_labor_cost AS SUM(service_cost.annual_labor_cost) COMMENT = 'Total annual labor cost',
     matched_equipment_count AS COUNT_IF(site_equipment.is_matched = TRUE)
@@ -104,7 +130,37 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_KG_MODEL
       COMMENT = 'Percentage of site equipment matched to canonical devices'
   )
 
-  COMMENT = 'Resolved MMD knowledge graph with canonical devices, manufacturers, families, costs, and match status';
+  COMMENT = 'Resolved MMD knowledge graph with canonical devices, manufacturers, families, costs, and match status'
+
+  AI_VERIFIED_QUERIES (
+    vq_fleet_cost AS (
+      QUESTION 'What is the estimated annual maintenance cost for this site''s device fleet?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT SUM(fleet_annual_cost) AS estimated_annual_cost, COUNT_IF(fleet_is_matched) AS priced_devices, COUNT(*) AS total_devices, COUNT(*) - COUNT_IF(fleet_is_matched) AS unpriced_devices FROM __site_fleet'
+    ),
+    vq_match_rate AS (
+      QUESTION 'What is the current match rate for the site inventory?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT COUNT(*) AS total_devices, COUNT_IF(fleet_is_matched) AS matched_devices, ROUND(100.0 * COUNT_IF(fleet_is_matched) / COUNT(*), 1) AS match_rate_pct FROM __site_fleet'
+    ),
+    vq_match_basis AS (
+      QUESTION 'How were the site devices matched, by match method?'
+      SQL 'SELECT fleet_match_basis, COUNT(*) AS devices FROM __site_fleet GROUP BY fleet_match_basis ORDER BY devices DESC'
+    ),
+    vq_cost_by_department AS (
+      QUESTION 'What is the estimated annual cost by department?'
+      SQL 'SELECT fleet_dept_name, COUNT(*) AS devices, COUNT_IF(fleet_is_matched) AS priced_devices, SUM(fleet_annual_cost) AS annual_cost FROM __site_fleet GROUP BY fleet_dept_name ORDER BY annual_cost DESC NULLS LAST'
+    ),
+    vq_unmatched_devices AS (
+      QUESTION 'Which devices could not be matched?'
+      ONBOARDING_QUESTION TRUE
+      SQL 'SELECT fleet_equip_id, fleet_raw_mfr, fleet_raw_model, fleet_raw_desc, fleet_dept_name, fleet_suggested_device, fleet_search_score FROM __site_fleet WHERE NOT fleet_is_matched ORDER BY fleet_raw_mfr, fleet_raw_model'
+    ),
+    vq_independent_confirmation AS (
+      QUESTION 'How many matches were independently confirmed by Cortex Search?'
+      SQL 'SELECT COUNT_IF(fleet_is_matched) AS matched_devices, COUNT_IF(fleet_is_matched AND fleet_search_agrees) AS confirmed_by_search, COUNT_IF(NOT fleet_is_matched) AS needs_review FROM __site_fleet'
+    )
+  );
 
 
 -- --------------------------------------------------------------------------

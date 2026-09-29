@@ -46,7 +46,7 @@ Manufacturer names alone have dozens of variants ("GE Healthcare", "General Elec
 ## Prerequisites
 
 - A Snowflake account in a **Cortex-enabled region** (the semantic views + agent use Cortex Analyst).
-- A role that can `CREATE DATABASE` (e.g. `SYSADMIN`) and a warehouse (e.g. `COMPUTE_WH`).
+- A role that can `CREATE DATABASE` (e.g. `SYSADMIN`) and a warehouse (e.g. `COMPUTE_WH`). **The build role itself needs `USAGE` on that warehouse** - not just your user via another role. The Cortex Search service refreshes as its owner role, so if the warehouse is owned by `ACCOUNTADMIN` with no grant, the deploy fails with *"warehouse ... is missing"*. Fix: `GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE SYSADMIN;`
 - **Snowflake CLI** (`snow`) with a connection in `~/.snowflake/connections.toml`. Check with `snow connection list`. The deploy defaults to a connection named `DEMO` - override with `SNOWFLAKE_CONNECTION` in `config.env`.
 - For the web app only: **Node 18+** and a **key-pair** connection (the browser cannot sign JWTs).
 
@@ -110,8 +110,22 @@ Device ──made_by──> Manufacturer
 ```
 
 **The "killer" demo question:** *"What is the estimated annual maintenance cost for this site's device fleet?"*
-- **Baseline agent fails:** site inventory says "GE B650" but TriMedx catalog says "B650" under manufacturer "GE" - the free-text manufacturer field doesn't join. The baseline can only price devices with exact key matches.
-- **With the ontology:** `FN_NORMALIZE_MFR` resolves "GE", "GE Healthcare", "General Electric Co", "GE Medical Systems", "G.E.", and "Gen Electric" to one canonical manufacturer. The 3-pass degrading-hierarchy matcher (exact model -> fuzzy model -> description) resolves 45%+ of the site's 139 devices automatically, producing a $676K fleet cost estimate. Unmatched devices are explicitly flagged as unpriced risk.
+Measured results, same question to both agents:
+
+| | Baseline agent (raw tables) | MMD Ontology Agent |
+|---|---|---|
+| Devices priced | 34 of 140 (24%) | 138 of 139 (99.3%) |
+| Estimated annual fleet cost | $268,700 (a floor) | $1,222,400 |
+| Wrong matches | n/a | 0 (verified row by row) |
+| Left for review | 106 unpriced | 1 (Acme FP-100, not in the TriMedx catalog) |
+
+- **Baseline:** the site's free-text model strings only join to the TriMedx catalog on an exact match, so 76% of the fleet can't be priced. That 24% lines up with TriMedx's real-world ~20% first-pass auto-match rate.
+- **Ontology:** matching is layered, and a wrong match is treated as worse than no match, because it produces a confident wrong price:
+  1. **Rules** - `FN_NORMALIZE_MFR` resolves manufacturer aliases and acquisitions; `FN_NORMALIZE_MODEL` normalizes model strings (`PB 840` = `PB840`, `Servo U` = `Servo-u`). `EXACT_MODEL`, then `FUZZY_MODEL`. If two catalog devices tie, nothing is guessed.
+  2. **Cortex Search** (`CSS_DEVICE_CATALOG`, via `CORTEX_SEARCH_BATCH`) - semantic matching over the catalog. Auto-accepted as `SEARCH_MATCH` only when cosine >= 0.55 and >= 0.05 ahead of the runner-up.
+  3. **Review** - anything else is `NEEDS_REVIEW`, with Cortex Search's suggestion pre-filled.
+
+**Rules vs Cortex Search.** The alias list was written against this demo dataset, so the rules result is optimistic: the next site brings variants no one has written a rule for yet. As a fair test, Cortex Search was run on all 139 devices *with no alias list at all*. It ranked the correct catalog device first for all 138 matchable devices, and its confidence gate auto-accepted 127 of them with zero errors. The 11 it held back were close calls between sibling models (Puritan Bennett 980 vs 840, Carescape B650 vs B850) - exactly the look-alikes with different service costs. On the 138 rule matches, Cortex Search independently chose the same device every time (`SEARCH_AGREES`).
 
 ## What you deploy (at a glance)
 
@@ -120,12 +134,13 @@ Device ──made_by──> Manufacturer
 - **100 FDA device records** across 20+ manufacturers with deliberate naming inconsistencies
 - **100 TriMedx catalog entries** with device families, PM schedules, and annual cost estimates
 - **140 site inventory records** from a 450-bed hospital with ~15% hard-to-match entries
-- A **physical KG** (`KG_NODE` / `KG_EDGE`) with 583 nodes and 673 edges
+- A **physical KG** (`KG_NODE` / `KG_EDGE`) with 583 nodes and 748 edges
 - **9 ontology classes** (Device, Manufacturer, DeviceFamily, SiteEquipment, ServiceCost, MaintenanceSchedule, FDARecord, Site, Department) and **8 relationships**
-- **4 Cortex Analyst semantic views** (base, KG, ontology, metadata)
-- **2 Cortex Agents** - the full MMD Ontology Agent (8 intent-routed tools) and a baseline agent for comparison
+- **4 Cortex Analyst semantic views** (base, KG, ontology, metadata), with **6 verified queries** on the KG view (fleet cost, match rate, match method, cost by department, unmatched devices, search confirmation)
+- **A Cortex Search service** (`CSS_DEVICE_CATALOG`) over the TriMedx catalog, used for batch matching and as a live agent tool
+- **2 Cortex Agents** - the full MMD Ontology Agent (9 intent-routed tools, including Cortex Search) and a baseline agent for comparison
 - **Manufacturer alias resolution** via `FN_NORMALIZE_MFR` (handles 50+ name variants)
-- **3-pass device matching** with degrading confidence: EXACT_MODEL -> FUZZY_MODEL -> DESC_MATCH
+- **Layered device matching**: EXACT_MODEL -> FUZZY_MODEL -> SEARCH_MATCH -> NEEDS_REVIEW, with ties never auto-priced
 
 ## The source data's deliberate messiness
 
@@ -138,6 +153,7 @@ The demo works because the synthetic data has specific, realistic messiness:
 5. **Model number formatting** - FDA includes revision suffixes (B650 v2, A500 SW 3.0); TriMedx uses short codes (B650, A500); site uses whatever the tech typed
 6. **Overloaded inventory rows** - each EQUIPMENT_LIST row carries device + location + service history + condition
 7. **Unmatched devices = unpriced risk** - every device that fails matching has no cost estimate, so the quote underestimates
+8. **Look-alike models, different prices** - sibling models (PB 980 vs PB 840, B650 vs B850) are close in name but not in service cost
 
 See [`sql/data/README.md`](sql/data/README.md) for the original alignment challenge reference.
 

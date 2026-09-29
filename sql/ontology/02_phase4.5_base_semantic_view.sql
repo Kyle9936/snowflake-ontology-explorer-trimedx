@@ -49,7 +49,7 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_BASE
     trimedx_pm.est_labor_hours AS est_labor_hours COMMENT = 'Estimated technician hours per PM event',
     trimedx_cost.annual_parts_cost AS annual_parts_cost COMMENT = 'Estimated annual parts spend',
     trimedx_cost.annual_labor_cost AS annual_labor_cost COMMENT = 'Estimated annual labor cost',
-    trimedx_cost.annual_pm_cost AS annual_pm_cost COMMENT = 'PM-specific annual cost',
+    trimedx_cost.annual_pm_cost AS annual_pm_cost COMMENT = 'Preventive-maintenance portion of annual labor cost. Already included in labor; never add it to parts + labor.',
     trimedx_cost.annual_total_cost AS annual_total_cost
       WITH SYNONYMS = ('total cost', 'annual cost', 'service cost', 'maintenance cost')
       COMMENT = 'Total annual service cost per device model'

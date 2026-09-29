@@ -97,7 +97,7 @@ const NODES = [
             { name: 'rawModel', description: 'Original model text (may include brand name or just a number)' },
             { name: 'rawDesc', description: 'Free-text description from site CMMS export' },
             { name: 'isMatched', description: 'Whether this equipment was resolved to a canonical Device' },
-            { name: 'matchBasis', description: 'EXACT_MODEL / FUZZY_MODEL / DESC_MATCH' },
+            { name: 'matchBasis', description: 'EXACT_MODEL / FUZZY_MODEL (rules), SEARCH_MATCH (Cortex Search), NEEDS_REVIEW' },
         ],
         mappings: [
             { system: RX_DB, table: 'EQUIPMENT_LIST', note: 'EQUIP_ID + free-text MANUFACTURER / MODEL / DEVICE_DESCRIPTION' },
@@ -412,11 +412,12 @@ export function isKnownObject(db, schema, table) {
 export const CHALLENGES = [
     { id: 1, title: 'Same device, different names', blurb: '"GE Carescape B650" (TriMedx) vs "GE Healthcare CARESCAPE Monitor B650" (FDA) vs "GE B650" (site). The ontology resolves them to one canonical Device.' },
     { id: 2, title: 'Manufacturer alias chaos', blurb: '"GE Healthcare", "General Electric Co", "GE Medical Systems", "GE", "G.E.", "Gen Electric", "GE Med Sys" - all the same company. FN_NORMALIZE_MFR resolves them.' },
-    { id: 3, title: 'Missing identity keys', blurb: 'Not every device has an FDA DI. Some site entries lack model numbers. The matcher degrades gracefully: exact model, fuzzy model, description match.' },
+    { id: 3, title: 'Missing identity keys', blurb: 'Not every device has an FDA DI. Some site entries lack model numbers. The matcher degrades gracefully: exact model, then fuzzy model, then Cortex Search over the catalog, then human review.' },
     { id: 4, title: 'Acquisition name changes', blurb: '"Toshiba" is now Canon Medical. "Covidien" is now Medtronic. "CareFusion" is now BD. "Maquet" is now Getinge. The ontology maps legacy names.' },
     { id: 5, title: 'Model number formatting', blurb: 'FDA includes revision suffixes (B650 v2, A500 SW 3.0). TriMedx uses short codes (B650, A500). Site uses whatever the tech typed. FN_NORMALIZE_MODEL strips the noise.' },
     { id: 6, title: 'Overloaded inventory rows', blurb: 'Each EQUIPMENT_LIST row is a device + location + service history + condition. The ontology decomposes it into SiteEquipment + Department + Device links.' },
-    { id: 7, title: 'Unmatched devices = unpriced risk', blurb: 'Every device that fails matching has no cost estimate. The quote underestimates the fleet. The ontology quantifies this gap explicitly.' },
+    { id: 7, title: 'Unmatched devices = unpriced risk', blurb: 'Every device that fails matching has no cost estimate, so the quote underestimates the fleet. On raw tables, 34 of 140 devices price out ($268,700). Through the ontology, 138 of 139 do ($1,222,400), and the 1 left is flagged for review.' },
+    { id: 8, title: 'Look-alike models, different prices', blurb: 'Sibling models (Puritan Bennett 980 vs 840, Carescape B650 vs B850) look nearly identical to a search engine but carry different service costs. Ties are never guessed: close calls go to review with a suggested match, and every auto-match is cross-checked by Cortex Search.' },
 ];
 
 export function getOverview() {

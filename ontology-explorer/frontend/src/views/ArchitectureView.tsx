@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /**
  * Architecture view — a static, color-coded diagram of the ontology stack,
@@ -47,14 +47,16 @@ function LayerCol({
   n,
   title,
   children,
+  innerRef,
 }: {
   cls: string;
   n: string;
   title: string;
   children: React.ReactNode;
+  innerRef?: React.Ref<HTMLElement>;
 }) {
   return (
-    <section className={`arch-layer ${cls}`}>
+    <section className={`arch-layer ${cls}`} ref={innerRef}>
       <header className="arch-head">
         <span className="arch-head-n">{n}</span>
         <span className="arch-head-t">{title}</span>
@@ -80,10 +82,82 @@ function Cards({ items }: { items: Card[] }) {
 
 const Flow = () => <div className="arch-flow" aria-hidden>→</div>;
 
+const VERIFIED_QUERIES = [
+  'Fleet cost',
+  'Match rate',
+  'Match method',
+  'Cost by department',
+  'Unmatched devices',
+  'Search confirmation',
+];
+
+/**
+ * The bypass path: raw tables go straight to the Base semantic view with no
+ * ontology in between. That is the "before" in the base-vs-ontology agent
+ * comparison. Drawn as an elbow under the stack, anchored to measured DOM
+ * positions so it tracks the layout on resize.
+ */
+function BypassArrow({
+  stage,
+  from,
+  to,
+}: {
+  stage: React.RefObject<HTMLDivElement | null>;
+  from: React.RefObject<HTMLDivElement | null>;
+  to: React.RefObject<HTMLElement | null>;
+}) {
+  const [geo, setGeo] = useState<{ sx: number; sy: number; ex: number; ey: number; lane: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!stage.current || !from.current || !to.current) return;
+      const s = stage.current.getBoundingClientRect();
+      const a = from.current.getBoundingClientRect();
+      const b = to.current.getBoundingClientRect();
+      setGeo({
+        sx: a.left + a.width / 2 - s.left,
+        sy: a.bottom - s.top,
+        ex: b.left + b.width / 2 - s.left,
+        ey: b.bottom - s.top,
+        lane: Math.max(a.bottom, b.bottom) - s.top + 26,
+      });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (stage.current) ro.observe(stage.current);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [stage, from, to]);
+
+  if (!geo) return null;
+  const { sx, sy, ex, ey, lane } = geo;
+  return (
+    <>
+      <svg className="arch-bypass" aria-hidden>
+        <defs>
+          <marker id="bypass-head" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" />
+          </marker>
+        </defs>
+        <path d={`M${sx},${sy} V${lane} H${ex} V${ey + 4}`} markerEnd="url(#bypass-head)" />
+      </svg>
+      <div className="arch-bypass-label" style={{ left: (sx + ex) / 2, top: lane }}>
+        Bypass: raw tables → Base semantic view, no ontology. The "before" in the agent comparison.
+      </div>
+    </>
+  );
+}
+
 export default function ArchitectureView() {
   // Fade the diagram in once mounted (nice on tab switch).
   const [ready, setReady] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const rawRef = useRef<HTMLDivElement>(null);
+  const l4Ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 30);
     return () => clearTimeout(t);
@@ -94,14 +168,16 @@ export default function ArchitectureView() {
       <div className="arch-intro">
         <h2>Ontology architecture</h2>
         <p>
-          Five layers, left to right — raw source data is resolved into a knowledge graph,
-          described by ontology metadata, exposed as generated views &amp; semantic models, and
-          finally reasoned over by the agent.
+          Five layers, left to right. Raw source data is resolved into a knowledge graph (with
+          Cortex Search for fuzzy device matching), described by ontology metadata, exposed as
+          generated views and semantic views with verified queries, and finally reasoned over by
+          the agent. The dashed path underneath is the shortcut most teams take today: semantic
+          views straight on raw tables, no ontology.
         </p>
       </div>
 
       <div className="arch-scroll">
-        <div className="arch-stage">
+        <div className="arch-stage" ref={stageRef}>
           {/* ---------- Layer 1: Physical Storage (raw + KG tables) ---------- */}
           <section className="arch-layer l1 arch-l1">
             <header className="arch-head">
@@ -109,7 +185,7 @@ export default function ArchitectureView() {
               <span className="arch-head-t">Physical Storage</span>
             </header>
             <div className="arch-body arch-l1-body">
-              <div className="arch-group">
+              <div className="arch-group" ref={rawRef}>
                 <div className="arch-group-title">Raw source tables</div>
                 <Cards
                   items={[
@@ -126,6 +202,7 @@ export default function ArchitectureView() {
                   items={[
                     { name: 'KG_NODE', sub: 'canonical entities' },
                     { name: 'KG_EDGE', sub: 'typed relationships' },
+                    { name: 'CSS_DEVICE_CATALOG', sub: 'Cortex Search · fuzzy MMD matching', tag: 'search' },
                   ]}
                 />
               </div>
@@ -186,15 +263,21 @@ export default function ArchitectureView() {
           <Flow />
 
           {/* ---------- Layer 4: Semantic Models ---------- */}
-          <LayerCol cls="l4 arch-l4" n="Layer 4" title="Semantic Models">
+          <LayerCol cls="l4 arch-l4" n="Layer 4" title="Semantic Views" innerRef={l4Ref}>
             <Cards
               items={[
-                { name: 'Base', sub: 'MMD_ONTOLOGY_BASE', tag: 'raw' },
+                { name: 'Base', sub: 'MMD_ONTOLOGY_BASE', tag: 'bypass' },
                 { name: 'Ontology', sub: 'MMD_ONTOLOGY_ONTOLOGY_MODEL', tag: 'resolved' },
                 { name: 'Governance', sub: 'MMD_ONTOLOGY_METADATA_MODEL', tag: 'metadata' },
                 { name: 'Knowledge Graph', sub: 'MMD_ONTOLOGY_KG_MODEL', tag: 'star' },
               ]}
             />
+            <div className="arch-subhead">Verified queries · KG view</div>
+            <div className="arch-chips">
+              {VERIFIED_QUERIES.map((q) => (
+                <span className="arch-chip vq" key={q}>✓ {q}</span>
+              ))}
+            </div>
           </LayerCol>
 
           <Flow />
@@ -214,6 +297,10 @@ export default function ArchitectureView() {
                 <span className="arch-chip" key={t}>{t}</span>
               ))}
             </div>
+            <div className="arch-subhead">Search tool → catalog</div>
+            <div className="arch-chips">
+              <span className="arch-chip search">catalog_search_tool</span>
+            </div>
             <div className="arch-subhead">KG traversal tools</div>
             <div className="arch-chips">
               {['get_ancestors', 'expand_descendants', 'get_direct_children', 'get_hierarchy_path'].map((t) => (
@@ -221,6 +308,7 @@ export default function ArchitectureView() {
               ))}
             </div>
           </LayerCol>
+          <BypassArrow stage={stageRef} from={rawRef} to={l4Ref} />
         </div>
       </div>
     </div>

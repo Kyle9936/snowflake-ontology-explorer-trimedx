@@ -55,25 +55,25 @@ AS $$
     -- GE variants
     WHEN UPPER(TRIM(raw_name)) IN ('GE','G.E.','GE HEALTHCARE','GE MEDICAL SYSTEMS','GENERAL ELECTRIC CO','GENERAL ELECTRIC','GE MED SYS','GEN ELECTRIC','GE HEALTHCARE SYSTEMS') THEN 'GE Healthcare'
     -- Philips variants
-    WHEN UPPER(TRIM(raw_name)) IN ('PHIL','PHIL MEDICAL','PHILIPS','PHILIPS MEDICAL SYSTEMS','PHILIPS HEALTHCARE','KONINKLIJKE PHILIPS N.V.','KONINKLIJKE PHILIPS NV') THEN 'Philips'
+    WHEN UPPER(TRIM(raw_name)) IN ('PHIL','PHIL MEDICAL','PHILIPS','PHILIPS MEDICAL','PHILIPS MEDICAL SYSTEMS','PHILIPS HEALTHCARE','KONINKLIJKE PHILIPS N.V.','KONINKLIJKE PHILIPS NV') THEN 'Philips'
     -- Siemens variants
     WHEN UPPER(TRIM(raw_name)) IN ('SIEMENS','SIEMENS HEALTHINEERS','SIEMENS HEALTHINEERS AG','SIEMENS MEDICAL SOLUTIONS USA') THEN 'Siemens Healthineers'
     -- Medtronic / Covidien variants
-    WHEN UPPER(TRIM(raw_name)) IN ('MEDTRONIC','MEDTRONIC, INC.','MEDTRONIC INC','MEDTRONIC PLC','COVIDIEN','COVIDIEN LLC') THEN 'Medtronic'
+    WHEN UPPER(TRIM(raw_name)) IN ('MEDTRONIC','MEDTRONIC, INC.','MEDTRONIC INC','MEDTRONIC PLC','MEDTRONIC / COVIDIEN','COVIDIEN','COVIDIEN LLC') THEN 'Medtronic'
     -- Stryker variants
-    WHEN UPPER(TRIM(raw_name)) IN ('STRYKER','STRYKER CORPORATION','STRYKER INSTRUMENTS','HOWMEDICA OSTEONICS CORP','HOWMEDICA') THEN 'Stryker'
+    WHEN UPPER(TRIM(raw_name)) IN ('STRYKER','STRYKER CORP','STRYKER CORPORATION','STRYKER INSTRUMENTS','HOWMEDICA OSTEONICS CORP','HOWMEDICA') THEN 'Stryker'
     -- Baxter variants
     WHEN UPPER(TRIM(raw_name)) IN ('BAXTER','BAXTER INTERNATIONAL INC','BAXTER INTERNATIONAL','BAXTER HEALTHCARE CORPORATION','BAXTER HEALTHCARE') THEN 'Baxter'
     -- Draeger variants
     WHEN UPPER(TRIM(raw_name)) IN ('DRAEGER','DRAGER','DRAEGER MEDICAL','DRAGER MEDICAL','DRAEGER MEDICAL INC','DRAGER MEDICAL INC','DRAEGERWERK AG','DRAEGERWERK','DRAGERWERK AG') THEN 'Draeger'
     -- BD variants
-    WHEN UPPER(TRIM(raw_name)) IN ('BD','BECTON DICKINSON','BECTON DICKINSON AND COMPANY','CAREFUSION','CAREFUSION CORPORATION') THEN 'BD'
+    WHEN UPPER(TRIM(raw_name)) IN ('BD','BECTON DICKINSON','BECTON DICKINSON AND COMPANY','BECTON DICKINSON / CAREFUSION','CAREFUSION','CAREFUSION CORPORATION') THEN 'BD'
     -- Hill-Rom variants
-    WHEN UPPER(TRIM(raw_name)) IN ('HILL-ROM','HILLROM','HILL-ROM HOLDINGS INC','HILL-ROM HOLDINGS','WELCH ALLYN','WELCH ALLYN INC') THEN 'Hill-Rom'
+    WHEN UPPER(TRIM(raw_name)) IN ('HILL-ROM','HILLROM','HILL-ROM HOLDINGS INC','HILL-ROM HOLDINGS','HILL-ROM / HILLROM / WELCH ALLYN','WELCH ALLYN','WELCH ALLYN INC','WELCH ALLYN / HILLROM') THEN 'Hill-Rom'
     -- Canon / Toshiba variants
-    WHEN UPPER(TRIM(raw_name)) IN ('CANON','CANON MEDICAL','CANON MEDICAL SYSTEMS CORPORATION','CANON MEDICAL SYSTEMS','TOSHIBA','TOSHIBA MEDICAL','TOSHIBA MEDICAL SYSTEMS CORPORATION','TOSHIBA MEDICAL SYSTEMS') THEN 'Canon Medical'
+    WHEN UPPER(TRIM(raw_name)) IN ('CANON','CANON MEDICAL','CANON MEDICAL SYSTEMS CORPORATION','CANON MEDICAL SYSTEMS','CANON MEDICAL / TOSHIBA MEDICAL','TOSHIBA','TOSHIBA MEDICAL','TOSHIBA MEDICAL SYSTEMS CORPORATION','TOSHIBA MEDICAL SYSTEMS') THEN 'Canon Medical'
     -- Getinge / Maquet variants
-    WHEN UPPER(TRIM(raw_name)) IN ('GETINGE','GETINGE AB','MAQUET','MAQUET MEDICAL SYSTEMS','MAQUET MEDICAL') THEN 'Getinge'
+    WHEN UPPER(TRIM(raw_name)) IN ('GETINGE','GETINGE AB','GETINGE / MAQUET','MAQUET','MAQUET MEDICAL SYSTEMS','MAQUET MEDICAL') THEN 'Getinge'
     -- Smith+Nephew variants
     WHEN UPPER(TRIM(raw_name)) IN ('SMITH & NEPHEW','SMITH AND NEPHEW','SMITH+NEPHEW','SMITH NEPHEW','SMITH & NEPHEW PLC','SMITH AND NEPHEW INC') THEN 'Smith+Nephew'
     -- Olympus variants
@@ -83,27 +83,44 @@ AS $$
     -- Vyaire / CareFusion ventilator line
     WHEN UPPER(TRIM(raw_name)) IN ('VYAIRE','VYAIRE MEDICAL','VYAIRE MEDICAL INC') THEN 'Vyaire'
     -- Mindray variants
-    WHEN UPPER(TRIM(raw_name)) IN ('MINDRAY','MINDRAY DS USA INC','MINDRAY DS USA','SHENZHEN MINDRAY BIO-MEDICAL','SHENZHEN MINDRAY') THEN 'Mindray'
+    WHEN UPPER(TRIM(raw_name)) IN ('MINDRAY','MINDRAY MEDICAL','MINDRAY DS USA INC','MINDRAY DS USA','SHENZHEN MINDRAY BIO-MEDICAL','SHENZHEN MINDRAY') THEN 'Mindray'
     -- Steris variants
     WHEN UPPER(TRIM(raw_name)) IN ('STERIS','STERIS PLC','STERIS CORPORATION') THEN 'Steris'
     -- Masimo (handle typo "Masiom")
-    WHEN UPPER(TRIM(raw_name)) IN ('MASIMO','MASIMO CORPORATION','MASIOM') THEN 'Masimo'
+    WHEN UPPER(TRIM(raw_name)) IN ('MASIMO','MASIMO CORP','MASIMO CORPORATION','MASIOM') THEN 'Masimo'
+    -- ZOLL variants
+    WHEN UPPER(TRIM(raw_name)) IN ('ZOLL','ZOLL MEDICAL','ZOLL MEDICAL CORPORATION') THEN 'ZOLL'
+    -- Hamilton variants
+    WHEN UPPER(TRIM(raw_name)) IN ('HAMILTON','HAMILTON MEDICAL','HAMILTON MEDICAL AG','HAMILTON MEDICAL INC') THEN 'Hamilton Medical'
+    -- Nihon Kohden variants
+    WHEN UPPER(TRIM(raw_name)) IN ('NIHON KOHDEN','NIHON KOHDEN CORPORATION','NIHON KOHDEN AMERICA') THEN 'Nihon Kohden'
+    -- Spacelabs variants
+    WHEN UPPER(TRIM(raw_name)) IN ('SPACELABS','SPACELABS HEALTHCARE') THEN 'Spacelabs'
+    -- Natus variants
+    WHEN UPPER(TRIM(raw_name)) IN ('NATUS','NATUS MEDICAL','NATUS MEDICAL INC') THEN 'Natus'
+    -- Hologic variants
+    WHEN UPPER(TRIM(raw_name)) IN ('HOLOGIC','HOLOGIC INC') THEN 'Hologic'
+    -- Teleflex variants
+    WHEN UPPER(TRIM(raw_name)) IN ('TELEFLEX','TELEFLEX INC','TELEFLEX INCORPORATED') THEN 'Teleflex'
     -- Direct pass-through for already-clean names
     ELSE INITCAP(TRIM(raw_name))
   END
 $$;
 
 -- ---- Canonicalization helper: normalize model number ----------------------
+-- Returns a compact match key: uppercase letters and digits only.
+-- Strips a trailing software/revision suffix ("v2", "v3.0", "Rev B", "SW 3.0",
+-- "BT20", "Gen 3") only when it is a separate trailing token. Real model
+-- numbers that start with V (V800, V680, VN800) have 3+ digits and are kept.
 CREATE OR REPLACE FUNCTION FN_NORMALIZE_MODEL(raw_model STRING)
 RETURNS STRING
 AS $$
-  -- Strip common noise: leading/trailing spaces, "v2", "Rev B", "v3.0", etc.
   REGEXP_REPLACE(
     REGEXP_REPLACE(
       UPPER(TRIM(raw_model)),
-      '\\s*(V[0-9]+\\.?[0-9]*|REV\\s*[A-Z0-9]+|SW\\s*[0-9]+\\.?[0-9]*|BT[0-9]+|GEN\\s*[0-9]+)\\s*$', ''
+      '\\s+(V[0-9]{1,2}(\\.[0-9A-Z]+)?|REV\\s*[A-Z0-9]+|SW\\s*[0-9.]+|BT[0-9]+|GEN\\s*[0-9]+)$', ''
     ),
-    '\\s+', ' '
+    '[^A-Z0-9]', ''
   )
 $$;
 
@@ -123,85 +140,143 @@ SELECT
 FROM FDA_DEVICES.GUDID.DEVICE_RECORD f
 JOIN TRIMEDX_MMD.MASTER.DEVICE_CATALOG c ON c.FDA_DI = f.GUDID_DI;
 
--- Site inventory -> TriMedx catalog (degrading hierarchy: model exact -> mfr+model fuzzy -> mfr+desc fuzzy)
-CREATE OR REPLACE VIEW STG_MAP_SITE_TO_CATALOG AS
+-- Site inventory -> TriMedx catalog, deterministic rules pass.
+--   Pass 1 EXACT_MODEL: same canonical mfr, model key equals catalog model or device-name key
+--   Pass 2 FUZZY_MODEL: same canonical mfr, one key contains the other (keys >= 3 chars)
+-- A wrong match produces a confident wrong price, so a tie is never guessed:
+-- if more than one catalog device qualifies at the best pass, the record is
+-- emitted as AMBIGUOUS with no CATALOG_ID and falls through to Cortex Search.
+CREATE OR REPLACE VIEW STG_MAP_SITE_RULES AS
 WITH normalized_site AS (
     SELECT
         e.EQUIP_ID,
-        e.MANUFACTURER       AS RAW_MFR,
-        e.MODEL               AS RAW_MODEL,
-        e.DEVICE_DESCRIPTION  AS RAW_DESC,
         FN_NORMALIZE_MFR(e.MANUFACTURER) AS NORM_MFR,
-        FN_NORMALIZE_MODEL(e.MODEL)      AS NORM_MODEL
+        FN_NORMALIZE_MODEL(e.MODEL)      AS MODEL_KEY
     FROM SITE_INVENTORY.RAW.EQUIPMENT_LIST e
     WHERE e.STATUS != 'DECOMMISSIONED'
 ),
 normalized_catalog AS (
     SELECT
         c.CATALOG_ID,
-        c.MFR_ID,
-        m.MFR_NAME            AS TMX_MFR_SHORT,
-        FN_NORMALIZE_MFR(m.MFR_FULL_NAME) AS NORM_MFR,
-        c.MODEL_NUMBER,
-        FN_NORMALIZE_MODEL(c.MODEL_NUMBER) AS NORM_MODEL,
-        c.DEVICE_NAME,
-        c.DEVICE_DESC,
-        c.FAMILY_ID
+        FN_NORMALIZE_MFR(m.MFR_FULL_NAME)  AS NORM_MFR,
+        FN_NORMALIZE_MODEL(c.MODEL_NUMBER) AS MODEL_KEY,
+        FN_NORMALIZE_MODEL(c.DEVICE_NAME)  AS NAME_KEY
     FROM TRIMEDX_MMD.MASTER.DEVICE_CATALOG c
     JOIN TRIMEDX_MMD.MASTER.MANUFACTURER m ON m.MFR_ID = c.MFR_ID
     WHERE c.STATUS IN ('ACTIVE','LEGACY')
 ),
--- Pass 1: exact normalized manufacturer + exact normalized model
-match_exact AS (
+candidates AS (
     SELECT
         s.EQUIP_ID,
         nc.CATALOG_ID,
-        'EXACT_MODEL' AS MATCH_BASIS,
-        1 AS MATCH_RANK
+        CASE WHEN s.MODEL_KEY IN (nc.MODEL_KEY, nc.NAME_KEY) THEN 1 ELSE 2 END AS MATCH_RANK
     FROM normalized_site s
     JOIN normalized_catalog nc
       ON s.NORM_MFR = nc.NORM_MFR
-     AND s.NORM_MODEL = nc.NORM_MODEL
+     AND (   s.MODEL_KEY IN (nc.MODEL_KEY, nc.NAME_KEY)
+          OR (    LENGTH(s.MODEL_KEY) >= 3
+              AND (   (LENGTH(nc.MODEL_KEY) >= 3 AND (CONTAINS(s.MODEL_KEY, nc.MODEL_KEY) OR CONTAINS(nc.MODEL_KEY, s.MODEL_KEY)))
+                   OR (LENGTH(nc.NAME_KEY)  >= 3 AND (CONTAINS(s.MODEL_KEY, nc.NAME_KEY)  OR CONTAINS(nc.NAME_KEY,  s.MODEL_KEY))) ) ) )
 ),
--- Pass 2: normalized manufacturer + model contained in site model string (or vice versa)
-match_fuzzy_model AS (
-    SELECT
-        s.EQUIP_ID,
-        nc.CATALOG_ID,
-        'FUZZY_MODEL' AS MATCH_BASIS,
-        2 AS MATCH_RANK
-    FROM normalized_site s
-    JOIN normalized_catalog nc
-      ON s.NORM_MFR = nc.NORM_MFR
-     AND (   CONTAINS(s.NORM_MODEL, nc.NORM_MODEL)
-          OR CONTAINS(nc.NORM_MODEL, s.NORM_MODEL)
-          OR CONTAINS(UPPER(s.RAW_MODEL), UPPER(nc.DEVICE_NAME))
-          OR CONTAINS(UPPER(nc.DEVICE_NAME), UPPER(s.RAW_MODEL)) )
-     AND s.EQUIP_ID NOT IN (SELECT EQUIP_ID FROM match_exact)
+best AS (
+    SELECT EQUIP_ID, CATALOG_ID, MATCH_RANK
+    FROM candidates
+    QUALIFY MATCH_RANK = MIN(MATCH_RANK) OVER (PARTITION BY EQUIP_ID)
 ),
--- Pass 3: manufacturer match + description keyword overlap (weakest)
-match_desc AS (
-    SELECT
-        s.EQUIP_ID,
-        nc.CATALOG_ID,
-        'DESC_MATCH' AS MATCH_BASIS,
-        3 AS MATCH_RANK
-    FROM normalized_site s
-    JOIN normalized_catalog nc
-      ON s.NORM_MFR = nc.NORM_MFR
-     AND (   CONTAINS(UPPER(s.RAW_DESC), UPPER(nc.DEVICE_NAME))
-          OR CONTAINS(UPPER(nc.DEVICE_DESC), UPPER(SPLIT_PART(s.RAW_DESC,' ',1)))  )
-     AND s.EQUIP_ID NOT IN (SELECT EQUIP_ID FROM match_exact)
-     AND s.EQUIP_ID NOT IN (SELECT EQUIP_ID FROM match_fuzzy_model)
-),
-all_matches AS (
-    SELECT * FROM match_exact
-    UNION ALL SELECT * FROM match_fuzzy_model
-    UNION ALL SELECT * FROM match_desc
+resolved AS (
+    SELECT EQUIP_ID,
+           MIN(MATCH_RANK)            AS MATCH_RANK,
+           COUNT(DISTINCT CATALOG_ID) AS N_CANDIDATES,
+           MIN(CATALOG_ID)            AS ONLY_CATALOG_ID
+    FROM best
+    GROUP BY EQUIP_ID
 )
-SELECT EQUIP_ID, CATALOG_ID, MATCH_BASIS, MATCH_RANK
-FROM all_matches
-QUALIFY ROW_NUMBER() OVER (PARTITION BY EQUIP_ID ORDER BY MATCH_RANK, CATALOG_ID) = 1;
+SELECT
+    EQUIP_ID,
+    IFF(N_CANDIDATES = 1, ONLY_CATALOG_ID, NULL) AS CATALOG_ID,
+    CASE WHEN N_CANDIDATES > 1 THEN 'AMBIGUOUS'
+         WHEN MATCH_RANK = 1   THEN 'EXACT_MODEL'
+         ELSE 'FUZZY_MODEL' END                AS MATCH_BASIS,
+    MATCH_RANK,
+    N_CANDIDATES
+FROM resolved;
+
+-- ---- Cortex Search: semantic matching over the TriMedx catalog -------------
+-- Indexes catalog facts only (manufacturer names, device name, model, description,
+-- family). It does NOT use the FN_NORMALIZE_MFR alias list, so it can resolve
+-- variants no one has written a rule for yet.
+CREATE OR REPLACE CORTEX SEARCH SERVICE CSS_DEVICE_CATALOG
+  ON SEARCH_TEXT
+  ATTRIBUTES CATALOG_ID, MFR_NAME
+  WAREHOUSE = COMPUTE_WH
+  TARGET_LAG = '1 day'
+  COMMENT = 'TriMedx master catalog indexed for semantic MMD matching. One row per catalog device.'
+AS
+SELECT
+  c.CATALOG_ID,
+  m.MFR_NAME,
+  c.DEVICE_NAME,
+  c.MODEL_NUMBER,
+  m.MFR_NAME || ' ' || m.MFR_FULL_NAME || ' ' || c.DEVICE_NAME || ' ' || c.MODEL_NUMBER || ' ' ||
+    COALESCE(c.DEVICE_DESC, '') || ' ' || COALESCE(f.FAMILY_NAME, '') AS SEARCH_TEXT
+FROM TRIMEDX_MMD.MASTER.DEVICE_CATALOG c
+JOIN TRIMEDX_MMD.MASTER.MANUFACTURER m ON m.MFR_ID = c.MFR_ID
+LEFT JOIN TRIMEDX_MMD.MASTER.DEVICE_FAMILY f ON f.FAMILY_ID = c.FAMILY_ID
+WHERE c.STATUS IN ('ACTIVE','LEGACY');
+
+-- Top-2 Cortex Search candidates for every active site record (batch entity resolution).
+-- Confidence gate: auto-accept only when the top hit is strong (cosine >= 0.55) AND clearly
+-- ahead of the runner-up (margin >= 0.05). Sibling models (PB 980 vs PB 840, B650 vs B850)
+-- score close together and carry very different service costs, so close calls go to review.
+CREATE OR REPLACE TABLE STG_SEARCH_CANDIDATES AS
+WITH hits AS (
+    SELECT q.EQUIP_ID, r.CATALOG_ID, r.DEVICE_NAME, r.METADATA$RANK AS RNK,
+           PARSE_JSON(r.METADATA$RESULT_DETAIL):scores:cosine_similarity::FLOAT AS COS
+    FROM (SELECT EQUIP_ID, MANUFACTURER || ' ' || MODEL || ' ' || DEVICE_DESCRIPTION AS QTEXT
+          FROM SITE_INVENTORY.RAW.EQUIPMENT_LIST WHERE STATUS != 'DECOMMISSIONED') q,
+    LATERAL CORTEX_SEARCH_BATCH(
+        SERVICE_NAME => 'FDA_DEVICES.ONTOLOGY.CSS_DEVICE_CATALOG',
+        QUERY => q.QTEXT,
+        LIMIT => 2) r
+)
+SELECT
+    h1.EQUIP_ID,
+    h1.CATALOG_ID                   AS TOP_CATALOG_ID,
+    h1.DEVICE_NAME                  AS TOP_DEVICE,
+    ROUND(h1.COS, 3)                AS TOP_SCORE,
+    h2.CATALOG_ID                   AS RUNNER_UP_CATALOG_ID,
+    h2.DEVICE_NAME                  AS RUNNER_UP_DEVICE,
+    ROUND(h1.COS - COALESCE(h2.COS, 0), 3) AS MARGIN,
+    (h1.COS >= 0.55 AND h1.COS - COALESCE(h2.COS, 0) >= 0.05) AS IS_CONFIDENT
+FROM hits h1
+LEFT JOIN hits h2 ON h2.EQUIP_ID = h1.EQUIP_ID AND h2.RNK = 2
+WHERE h1.RNK = 1;
+
+-- Final resolution: rules first, then confident Cortex Search, else human review.
+--   EXACT_MODEL / FUZZY_MODEL  rules resolved it (SEARCH_AGREES shows whether search concurs)
+--   SEARCH_MATCH               rules could not; search is confident
+--   NEEDS_REVIEW               neither is confident; SUGGESTED_CATALOG_ID pre-fills the reviewer
+CREATE OR REPLACE VIEW STG_MAP_SITE_TO_CATALOG AS
+SELECT
+    e.EQUIP_ID,
+    CASE WHEN r.CATALOG_ID IS NOT NULL THEN r.CATALOG_ID
+         WHEN s.IS_CONFIDENT THEN s.TOP_CATALOG_ID END              AS CATALOG_ID,
+    CASE WHEN r.CATALOG_ID IS NOT NULL THEN r.MATCH_BASIS
+         WHEN s.IS_CONFIDENT THEN 'SEARCH_MATCH'
+         ELSE 'NEEDS_REVIEW' END                                     AS MATCH_BASIS,
+    CASE WHEN r.CATALOG_ID IS NOT NULL THEN r.MATCH_RANK
+         WHEN s.IS_CONFIDENT THEN 3 END                              AS MATCH_RANK,
+    r.MATCH_BASIS                                                    AS RULES_BASIS,
+    s.TOP_CATALOG_ID                                                 AS SUGGESTED_CATALOG_ID,
+    s.TOP_DEVICE                                                     AS SUGGESTED_DEVICE,
+    s.TOP_SCORE                                                      AS SEARCH_SCORE,
+    s.MARGIN                                                         AS SEARCH_MARGIN,
+    s.IS_CONFIDENT                                                   AS SEARCH_CONFIDENT,
+    (r.CATALOG_ID IS NOT NULL AND r.CATALOG_ID = s.TOP_CATALOG_ID)   AS SEARCH_AGREES
+FROM SITE_INVENTORY.RAW.EQUIPMENT_LIST e
+LEFT JOIN STG_MAP_SITE_RULES r   ON r.EQUIP_ID = e.EQUIP_ID
+LEFT JOIN STG_SEARCH_CANDIDATES s ON s.EQUIP_ID = e.EQUIP_ID
+WHERE e.STATUS != 'DECOMMISSIONED';
 
 -- Site inventory -> FDA (via resolved catalog's FDA_DI)
 CREATE OR REPLACE VIEW STG_MAP_SITE_TO_FDA AS
@@ -280,7 +355,12 @@ SELECT
     FN_NORMALIZE_MFR(e.MANUFACTURER) AS NORM_MFR,
     sm.CATALOG_ID         AS RESOLVED_CATALOG_ID,
     sm.MATCH_BASIS,
-    IFF(sm.CATALOG_ID IS NOT NULL, TRUE, FALSE) AS IS_MATCHED
+    IFF(sm.CATALOG_ID IS NOT NULL, TRUE, FALSE) AS IS_MATCHED,
+    sm.SUGGESTED_CATALOG_ID,
+    sm.SUGGESTED_DEVICE,
+    sm.SEARCH_SCORE,
+    sm.SEARCH_MARGIN,
+    sm.SEARCH_AGREES
 FROM SITE_INVENTORY.RAW.EQUIPMENT_LIST e
 LEFT JOIN STG_MAP_SITE_TO_CATALOG sm ON sm.EQUIP_ID = e.EQUIP_ID;
 
@@ -750,7 +830,7 @@ INSERT INTO ONT_IDENTITY_RULE VALUES
 ('Device',1,'FDA_DI','FDA Global Unique Device Identifier - direct match between TriMedx catalog and FDA registry','HIGH'),
 ('Device',2,'MFR+MODEL_EXACT','Normalized manufacturer name + exact normalized model number','HIGH'),
 ('Device',3,'MFR+MODEL_FUZZY','Normalized manufacturer + model substring/containment match','MEDIUM'),
-('Device',4,'MFR+DESC_MATCH','Normalized manufacturer + device description keyword overlap','LOW'),
+('Device',4,'SEARCH_MATCH','Cortex Search semantic match over the TriMedx catalog; auto-accepted only when cosine >= 0.55 and >= 0.05 ahead of the runner-up, otherwise sent to review with a suggestion','MEDIUM'),
 ('Manufacturer',1,'MFR_ID','TriMedx internal manufacturer ID','HIGH'),
 ('Manufacturer',2,'NORMALIZED_NAME','FN_NORMALIZE_MFR() resolves all known aliases to one canonical name','HIGH'),
 ('SiteEquipment',1,'EQUIP_ID','Site-assigned equipment identifier - unique within a site inventory','HIGH');
@@ -910,7 +990,9 @@ SELECT
     ROUND(100.0 * SUM(IFF(IS_MATCHED, 1, 0)) / COUNT(*), 1)  AS MATCH_RATE_PCT,
     SUM(IFF(MATCH_BASIS = 'EXACT_MODEL', 1, 0))               AS EXACT_MATCHES,
     SUM(IFF(MATCH_BASIS = 'FUZZY_MODEL', 1, 0))               AS FUZZY_MODEL_MATCHES,
-    SUM(IFF(MATCH_BASIS = 'DESC_MATCH', 1, 0))                AS DESC_MATCHES
+    SUM(IFF(MATCH_BASIS = 'SEARCH_MATCH', 1, 0))              AS SEARCH_MATCHES,
+    SUM(IFF(MATCH_BASIS = 'NEEDS_REVIEW', 1, 0))              AS NEEDS_REVIEW,
+    SUM(IFF(IS_MATCHED AND SEARCH_AGREES, 1, 0))              AS RULES_AND_SEARCH_AGREE
 FROM STG_SITE_EQUIPMENT
 WHERE STATUS != 'DECOMMISSIONED';
 
@@ -931,7 +1013,10 @@ SELECT
     sc.RISK_TIER,
     sc.COST_CONFIDENCE,
     se.MATCH_BASIS,
-    se.IS_MATCHED
+    se.IS_MATCHED,
+    se.SUGGESTED_DEVICE,
+    se.SEARCH_SCORE,
+    se.SEARCH_AGREES
 FROM STG_SITE_EQUIPMENT se
 LEFT JOIN STG_DEVICE dev ON dev.CATALOG_ID = se.RESOLVED_CATALOG_ID
 LEFT JOIN TRIMEDX_MMD.MASTER.SERVICE_COST_ESTIMATE sc ON sc.CATALOG_ID = se.RESOLVED_CATALOG_ID
