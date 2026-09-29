@@ -3,6 +3,10 @@
 Deploy an **Ontology-on-Snowflake knowledge graph** for medical device fleet management into your own account, then **visualize and explore it** in a local web app. The repo ships everything end to end: synthetic (deliberately messy) device data across three source systems, the SQL that builds a full ontology layer on top of it, and a React + Express app that renders the ontology as a graph and lets you chat with a Cortex Agent over it.
 
 > **Forked from [sfc-gh-ccaudill/snowflake-ontology-explorer](https://github.com/sfc-gh-ccaudill/snowflake-ontology-explorer)** and re-skinned for the Trimedx MMD (Make, Model, Description) use case. The original healthcare demo's architecture, framework, and patterns are preserved - only the domain data, ontology classes, and UI copy have been replaced.
+>
+> 
+> <img width="1676" height="1026" alt="Screenshot 2026-09-29 at 11 07 39 AM" src="https://github.com/user-attachments/assets/41817c81-c654-486c-a136-0f0a05e6552d" />
+
 
 ## What this is / when to use it
 
@@ -79,6 +83,11 @@ cp config.env.example config.env      # then edit - at minimum, set SNOWFLAKE_CO
 - **Visualizes the ontology as a network graph** (both the class model and the resolved instance graph)
 - **Inspects each class's cross-system source mappings** with live sample rows
 - **Chats with a Cortex Agent** over the ontology (with a baseline agent toggle for comparison)
+
+<img width="1672" height="1028" alt="Screenshot 2026-09-29 at 11 41 46 AM" src="https://github.com/user-attachments/assets/80a17d66-f6e2-4a10-ab1f-ddce1ef87ea7" />
+
+<img width="1677" height="942" alt="Screenshot 2026-09-29 at 11 42 44 AM" src="https://github.com/user-attachments/assets/5b50b822-73cc-465c-b505-ff1cb32cae52" />
+
 
 ```bash
 cd ontology-explorer
