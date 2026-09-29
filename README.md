@@ -1,4 +1,4 @@
-# MMD Ontology Explorer (TriMedx)
+# MMD Ontology Explorer (Trimedx)
 
 Deploy an **Ontology-on-Snowflake knowledge graph** for medical device fleet management into your own account, then **visualize and explore it** in a local web app. The repo ships everything end to end: synthetic (deliberately messy) device data across three source systems, the SQL that builds a full ontology layer on top of it, and a React + Express app that renders the ontology as a graph and lets you chat with a Cortex Agent over it.
 
