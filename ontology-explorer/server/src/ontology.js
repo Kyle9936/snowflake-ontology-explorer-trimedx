@@ -1,9 +1,9 @@
 /**
  * Canonical ontology definition for the MMD (Make, Model, Description) demo.
  *
- * This is a hand-authored model for the TriMedx device fleet management use
+ * This is a hand-authored model for the Trimedx device fleet management use
  * case. It renders a meaningful, explorable graph showing how medical devices
- * connect across FDA, TriMedx, and site inventory sources.
+ * connect across FDA, Trimedx, and site inventory sources.
  *
  * The frontend depends only on the JSON shape below (GROUPS, NODES, EDGES,
  * getOntology). No React changes needed.
@@ -28,10 +28,10 @@ const NODES = [
         label: 'Device',
         group: 'device',
         description:
-            'A canonical medical device from the TriMedx MMD catalog. Resolves naming variants across FDA, TriMedx, and site inventories into one identity. The same device may appear as "GE Carescape B650" (TriMedx), "GE Healthcare CARESCAPE Monitor B650" (FDA), and "GE B650" or "G.E. Carescape B650" (site inventory).',
+            'A canonical medical device from the Trimedx MMD catalog. Resolves naming variants across FDA, Trimedx, and site inventories into one identity. The same device may appear as "GE Carescape B650" (Trimedx), "GE Healthcare CARESCAPE Monitor B650" (FDA), and "GE B650" or "G.E. Carescape B650" (site inventory).',
         properties: [
-            { name: 'catalogId', description: 'TriMedx internal catalog identifier (canonical key)' },
-            { name: 'tmxModel', description: 'TriMedx model designation' },
+            { name: 'catalogId', description: 'Trimedx internal catalog identifier (canonical key)' },
+            { name: 'tmxModel', description: 'Trimedx model designation' },
             { name: 'deviceName', description: 'Short commercial device name' },
             { name: 'canonicalMfr', description: 'Resolved manufacturer name via FN_NORMALIZE_MFR' },
             { name: 'familyName', description: 'Device family for pricing and PM scheduling' },
@@ -51,11 +51,11 @@ const NODES = [
         label: 'Manufacturer',
         group: 'device',
         description:
-            'A device manufacturer. Resolves aliases across systems: "GE Healthcare" (FDA), "GE" (TriMedx), "G.E." / "Gen Electric" / "GE Med Sys" (site inventories) all map to one canonical Manufacturer.',
+            'A device manufacturer. Resolves aliases across systems: "GE Healthcare" (FDA), "GE" (Trimedx), "G.E." / "Gen Electric" / "GE Med Sys" (site inventories) all map to one canonical Manufacturer.',
         properties: [
-            { name: 'mfrId', description: 'TriMedx manufacturer ID (canonical key)' },
+            { name: 'mfrId', description: 'Trimedx manufacturer ID (canonical key)' },
             { name: 'canonicalName', description: 'Resolved via FN_NORMALIZE_MFR' },
-            { name: 'mfrShort', description: 'TriMedx internal abbreviation (GE, Phil, Siemens)' },
+            { name: 'mfrShort', description: 'Trimedx internal abbreviation (GE, Phil, Siemens)' },
             { name: 'fdaNameVariants', description: 'All distinct FDA COMPANY_NAME values for this manufacturer' },
             { name: 'mfrCountry', description: 'Country of origin' },
         ],
@@ -72,7 +72,7 @@ const NODES = [
         label: 'Device Family',
         group: 'operations',
         description:
-            'A logical grouping of similar devices for pricing, PM scheduling, and fleet analysis. Examples: Bedside Monitors, CT Scanners, Critical Care Ventilators, Infusion Pumps. TriMedx-only concept not present in FDA or site data.',
+            'A logical grouping of similar devices for pricing, PM scheduling, and fleet analysis. Examples: Bedside Monitors, CT Scanners, Critical Care Ventilators, Infusion Pumps. Trimedx-only concept not present in FDA or site data.',
         properties: [
             { name: 'familyId', description: 'Family identifier' },
             { name: 'familyName', description: 'Display name (e.g. "Bedside Monitors")' },
@@ -186,7 +186,7 @@ const NODES = [
         label: 'Department',
         group: 'place',
         description:
-            'A department or unit within the site (ICU, OR Suite, Radiology, etc.). Site naming conventions may differ from TriMedx standards.',
+            'A department or unit within the site (ICU, OR Suite, Radiology, etc.). Site naming conventions may differ from Trimedx standards.',
         properties: [
             { name: 'deptId', description: 'Department identifier' },
             { name: 'deptName', description: 'Department name (site convention)' },
@@ -256,11 +256,11 @@ export const SOURCE_SYSTEMS = [
     {
         db: CLAIMS_DB,
         schema: CLAIMS_SCHEMA,
-        label: 'TriMedx Master MMD',
+        label: 'Trimedx Master MMD',
         color: '#29B5E8',
-        description: 'TriMedx proprietary catalog. Abbreviated manufacturer names (GE, Phil, Siemens).',
+        description: 'Trimedx proprietary catalog. Abbreviated manufacturer names (GE, Phil, Siemens).',
         tables: [
-            { name: 'MANUFACTURER', description: 'Canonical manufacturer list with TriMedx-internal abbreviations.' },
+            { name: 'MANUFACTURER', description: 'Canonical manufacturer list with Trimedx-internal abbreviations.' },
             { name: 'DEVICE_CATALOG', description: 'The master MMD table - Make, Model, Description for every known device.' },
             { name: 'DEVICE_FAMILY', description: 'Logical device groupings for pricing and PM scheduling.' },
             { name: 'PM_SCHEDULE', description: 'Preventive maintenance templates by device family.' },
@@ -286,7 +286,7 @@ export const LINKAGE_KINDS = {
     manufacturer: { label: 'Manufacturer name - alias resolution', color: '#29B5E8' },
     model: { label: 'Model number - fuzzy match', color: '#7442BF' },
     family: { label: 'Device family - grouping key', color: '#F59F3B' },
-    catalog: { label: 'Catalog ID - TriMedx internal', color: '#11567F' },
+    catalog: { label: 'Catalog ID - Trimedx internal', color: '#11567F' },
 };
 
 export function classifyColumn(name) {
@@ -294,8 +294,8 @@ export function classifyColumn(name) {
     if (u.includes('GUDID') || u === 'FDA_DI') return { kind: 'device_id', label: 'FDA GUDID - strong device identity link' };
     if (u.includes('MFR') || u === 'MANUFACTURER' || u === 'COMPANY_NAME') return { kind: 'manufacturer', label: 'Manufacturer name - needs alias resolution' };
     if (u.includes('MODEL') || u === 'VERSION_MODEL_NUMBER') return { kind: 'model', label: 'Model number - fuzzy match across systems' };
-    if (u.includes('FAMILY_ID')) return { kind: 'family', label: 'Device family - TriMedx grouping key' };
-    if (u === 'CATALOG_ID') return { kind: 'catalog', label: 'TriMedx catalog ID - canonical device key' };
+    if (u.includes('FAMILY_ID')) return { kind: 'family', label: 'Device family - Trimedx grouping key' };
+    if (u === 'CATALOG_ID') return { kind: 'catalog', label: 'Trimedx catalog ID - canonical device key' };
     return null;
 }
 
@@ -410,11 +410,11 @@ export function isKnownObject(db, schema, table) {
 }
 
 export const CHALLENGES = [
-    { id: 1, title: 'Same device, different names', blurb: '"GE Carescape B650" (TriMedx) vs "GE Healthcare CARESCAPE Monitor B650" (FDA) vs "GE B650" (site). The ontology resolves them to one canonical Device.' },
+    { id: 1, title: 'Same device, different names', blurb: '"GE Carescape B650" (Trimedx) vs "GE Healthcare CARESCAPE Monitor B650" (FDA) vs "GE B650" (site). The ontology resolves them to one canonical Device.' },
     { id: 2, title: 'Manufacturer alias chaos', blurb: '"GE Healthcare", "General Electric Co", "GE Medical Systems", "GE", "G.E.", "Gen Electric", "GE Med Sys" - all the same company. FN_NORMALIZE_MFR resolves them.' },
     { id: 3, title: 'Missing identity keys', blurb: 'Not every device has an FDA DI. Some site entries lack model numbers. The matcher degrades gracefully: exact model, then fuzzy model, then Cortex Search over the catalog, then human review.' },
     { id: 4, title: 'Acquisition name changes', blurb: '"Toshiba" is now Canon Medical. "Covidien" is now Medtronic. "CareFusion" is now BD. "Maquet" is now Getinge. The ontology maps legacy names.' },
-    { id: 5, title: 'Model number formatting', blurb: 'FDA includes revision suffixes (B650 v2, A500 SW 3.0). TriMedx uses short codes (B650, A500). Site uses whatever the tech typed. FN_NORMALIZE_MODEL strips the noise.' },
+    { id: 5, title: 'Model number formatting', blurb: 'FDA includes revision suffixes (B650 v2, A500 SW 3.0). Trimedx uses short codes (B650, A500). Site uses whatever the tech typed. FN_NORMALIZE_MODEL strips the noise.' },
     { id: 6, title: 'Overloaded inventory rows', blurb: 'Each EQUIPMENT_LIST row is a device + location + service history + condition. The ontology decomposes it into SiteEquipment + Department + Device links.' },
     { id: 7, title: 'Unmatched devices = unpriced risk', blurb: 'Every device that fails matching has no cost estimate, so the quote underestimates the fleet. On raw tables, 34 of 140 devices price out ($268,700). Through the ontology, 138 of 139 do ($1,222,400), and the 1 left is flagged for review.' },
     { id: 8, title: 'Look-alike models, different prices', blurb: 'Sibling models (Puritan Bennett 980 vs 840, Carescape B650 vs B850) look nearly identical to a search engine but carry different service costs. Ties are never guessed: close calls go to review with a suggested match, and every auto-match is cross-checked by Cortex Search.' },

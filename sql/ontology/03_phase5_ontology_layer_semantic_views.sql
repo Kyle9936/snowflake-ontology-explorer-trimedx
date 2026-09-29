@@ -11,7 +11,7 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_KG_MODEL
   TABLES (
     device AS FDA_DEVICES.ONTOLOGY.V_DEVICE
       PRIMARY KEY (NODE_ID)
-      COMMENT = 'Canonical device resolved across FDA, TriMedx, and site inventory.',
+      COMMENT = 'Canonical device resolved across FDA, Trimedx, and site inventory.',
     manufacturer AS FDA_DEVICES.ONTOLOGY.V_MANUFACTURER
       PRIMARY KEY (NODE_ID)
       COMMENT = 'Canonical manufacturer. Resolves all name variants.',
@@ -67,7 +67,7 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_KG_MODEL
 
   DIMENSIONS (
     device.device_name AS device_name WITH SYNONYMS = ('device', 'equipment', 'model name') COMMENT = 'Canonical device name',
-    device.tmx_model AS tmx_model WITH SYNONYMS = ('model', 'model number') COMMENT = 'TriMedx model designation',
+    device.tmx_model AS tmx_model WITH SYNONYMS = ('model', 'model number') COMMENT = 'Trimedx model designation',
     device.canonical_mfr AS canonical_mfr WITH SYNONYMS = ('manufacturer', 'make', 'maker', 'oem') COMMENT = 'Resolved manufacturer name',
     device.family_name AS family_name WITH SYNONYMS = ('device type', 'family', 'category') COMMENT = 'Device family name',
     device.family_category AS family_category COMMENT = 'Broad category',
@@ -103,7 +103,7 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_KG_MODEL
     site_fleet.fleet_family_name AS family_name COMMENT = 'Device family of the resolved device',
     site_fleet.fleet_risk_tier AS risk_tier COMMENT = 'HIGH, MEDIUM, or LOW',
     site_fleet.fleet_match_basis AS match_basis COMMENT = 'EXACT_MODEL or FUZZY_MODEL (deterministic rules), SEARCH_MATCH (confident Cortex Search match), or NEEDS_REVIEW (sent to a human)',
-    site_fleet.fleet_suggested_device AS suggested_device COMMENT = 'Top Cortex Search candidate from the TriMedx catalog. For NEEDS_REVIEW rows this pre-fills the reviewer',
+    site_fleet.fleet_suggested_device AS suggested_device COMMENT = 'Top Cortex Search candidate from the Trimedx catalog. For NEEDS_REVIEW rows this pre-fills the reviewer',
     site_fleet.fleet_search_agrees AS search_agrees WITH SYNONYMS = ('independently confirmed', 'double checked') COMMENT = 'TRUE when Cortex Search independently picked the same device the rules matched',
     site_fleet.fleet_is_matched AS is_matched COMMENT = 'TRUE when the device resolved to a canonical device and has a cost estimate'
   )

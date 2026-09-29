@@ -3,11 +3,11 @@
  *
  * Unlike ontology.js (which describes the *classes*), this assembles a graph of
  * the ACTUAL DATA: real devices resolved and stitched across the three source
- * systems (FDA + TriMedx + Site Inventory) into one connected graph.
+ * systems (FDA + Trimedx + Site Inventory) into one connected graph.
  *
  * Entity resolution:
- *   - TriMedx <-> FDA : DEVICE_CATALOG.FDA_DI = DEVICE_RECORD.GUDID_DI
- *   - Site <-> TriMedx: degrading hierarchy via FN_NORMALIZE_MFR + model matching
+ *   - Trimedx <-> FDA : DEVICE_CATALOG.FDA_DI = DEVICE_RECORD.GUDID_DI
+ *   - Site <-> Trimedx: degrading hierarchy via FN_NORMALIZE_MFR + model matching
  *   - Manufacturer    : FN_NORMALIZE_MFR resolves all name variants to canonical
  *
  * "Hub" nodes (Manufacturer, DeviceFamily) are SHARED, so different devices
@@ -44,7 +44,7 @@ const inList = (arr) => {
 export async function getKnowledgeGraph(limit) {
     const n = Math.max(1, Math.min(Number(limit) || 10, 100));
 
-    // 1. Anchor on canonical devices from TriMedx catalog.
+    // 1. Anchor on canonical devices from Trimedx catalog.
     const devices = await query(`
         SELECT c.CATALOG_ID, c.MODEL_NUMBER, c.DEVICE_NAME, c.DEVICE_DESC,
                c.FDA_DI, c.FDA_CLASS, c.FAMILY_ID, c.STATUS,

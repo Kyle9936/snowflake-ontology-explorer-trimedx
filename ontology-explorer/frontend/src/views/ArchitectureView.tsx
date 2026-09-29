@@ -190,7 +190,7 @@ export default function ArchitectureView() {
                 <Cards
                   items={[
                     { name: 'DEVICE_RECORD', sub: 'GUDID registry entries', tag: 'FDA' },
-                    { name: 'DEVICE_CATALOG', sub: 'MANUFACTURER · DEVICE_FAMILY · PM_SCHEDULE', tag: 'TriMedx' },
+                    { name: 'DEVICE_CATALOG', sub: 'MANUFACTURER · DEVICE_FAMILY · PM_SCHEDULE', tag: 'Trimedx' },
                     { name: 'EQUIPMENT_LIST', sub: 'SITE_INFO · DEPARTMENT', tag: 'Site' },
                   ]}
                 />

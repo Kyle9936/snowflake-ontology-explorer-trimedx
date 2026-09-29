@@ -12,7 +12,7 @@
      - Cost estimates are in "SERVICE_COST_ESTIMATE" (annual cost per device)
 
    Intentional messiness in this file:
-     1. MFR_NAME uses TriMedx-internal abbreviations that don't match FDA or
+     1. MFR_NAME uses Trimedx-internal abbreviations that don't match FDA or
         site inventory naming ("GE" not "GE Healthcare", "Phil" not "Philips").
      2. MODEL_NUMBER sometimes differs from FDA VERSION_MODEL_NUMBER
         (no revision suffixes, different formatting).
@@ -33,11 +33,11 @@ CREATE SCHEMA   IF NOT EXISTS TRIMEDX_MMD.MASTER;
 USE SCHEMA TRIMEDX_MMD.MASTER;
 
 -- -----------------------------------------------------------------------------
--- MANUFACTURER  (canonical manufacturer list with TriMedx-internal IDs)
+-- MANUFACTURER  (canonical manufacturer list with Trimedx-internal IDs)
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE TABLE MANUFACTURER (
     MFR_ID          NUMBER,
-    MFR_NAME        STRING,       -- TriMedx abbreviation (differs from FDA)
+    MFR_NAME        STRING,       -- Trimedx abbreviation (differs from FDA)
     MFR_FULL_NAME   STRING,       -- longer form (still may differ from FDA)
     MFR_COUNTRY     STRING,
     ACTIVE_FLAG     BOOLEAN
@@ -132,7 +132,7 @@ CREATE OR REPLACE TABLE DEVICE_CATALOG (
     CATALOG_ID      NUMBER,
     MFR_ID          NUMBER,       -- FK to MANUFACTURER
     FAMILY_ID       NUMBER,       -- FK to DEVICE_FAMILY
-    MODEL_NUMBER    STRING,       -- TriMedx internal model designation
+    MODEL_NUMBER    STRING,       -- Trimedx internal model designation
     DEVICE_NAME     STRING,       -- short commercial name
     DEVICE_DESC     STRING,       -- abbreviated description
     FDA_DI          STRING,       -- link to FDA GUDID (nullable - not all matched)

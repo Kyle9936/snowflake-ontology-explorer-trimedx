@@ -2,13 +2,13 @@
 -- PHASE 4 - Ontology Layers 1-3 (+ inference, graph tools, provenance)
 -- MMD_ONTOLOGY  .  target: FDA_DEVICES.ONTOLOGY  .  build role: SYSADMIN
 -- =============================================================================
--- Adapted from the healthcare ontology explorer for the TriMedx MMD matching
+-- Adapted from the healthcare ontology explorer for the Trimedx MMD matching
 -- use case. Sources span three databases (read): FDA_DEVICES.GUDID,
 -- TRIMEDX_MMD.MASTER, SITE_INVENTORY.RAW. All ontology objects are created in
 -- FDA_DEVICES.ONTOLOGY.
 --
 -- The core entity resolution problem: the same medical device appears under
--- different names, model numbers, and manufacturer labels across FDA, TriMedx,
+-- different names, model numbers, and manufacturer labels across FDA, Trimedx,
 -- and incoming site inventories. The ontology resolves them into canonical
 -- Device nodes linked to maintenance costs, parts, and PM schedules.
 -- =============================================================================
@@ -128,7 +128,7 @@ $$;
 -- STAGING / RESOLUTION VIEWS  (identity crosswalks)
 -- ============================================================================
 
--- FDA GUDID -> TriMedx catalog (strong: direct FDA_DI match)
+-- FDA GUDID -> Trimedx catalog (strong: direct FDA_DI match)
 CREATE OR REPLACE VIEW STG_MAP_FDA_TO_CATALOG AS
 SELECT
     f.GUDID_DI,
@@ -140,7 +140,7 @@ SELECT
 FROM FDA_DEVICES.GUDID.DEVICE_RECORD f
 JOIN TRIMEDX_MMD.MASTER.DEVICE_CATALOG c ON c.FDA_DI = f.GUDID_DI;
 
--- Site inventory -> TriMedx catalog, deterministic rules pass.
+-- Site inventory -> Trimedx catalog, deterministic rules pass.
 --   Pass 1 EXACT_MODEL: same canonical mfr, model key equals catalog model or device-name key
 --   Pass 2 FUZZY_MODEL: same canonical mfr, one key contains the other (keys >= 3 chars)
 -- A wrong match produces a confident wrong price, so a tie is never guessed:
@@ -201,7 +201,7 @@ SELECT
     N_CANDIDATES
 FROM resolved;
 
--- ---- Cortex Search: semantic matching over the TriMedx catalog -------------
+-- ---- Cortex Search: semantic matching over the Trimedx catalog -------------
 -- Indexes catalog facts only (manufacturer names, device name, model, description,
 -- family). It does NOT use the FN_NORMALIZE_MFR alias list, so it can resolve
 -- variants no one has written a rule for yet.
@@ -210,7 +210,7 @@ CREATE OR REPLACE CORTEX SEARCH SERVICE CSS_DEVICE_CATALOG
   ATTRIBUTES CATALOG_ID, MFR_NAME
   WAREHOUSE = COMPUTE_WH
   TARGET_LAG = '1 day'
-  COMMENT = 'TriMedx master catalog indexed for semantic MMD matching. One row per catalog device.'
+  COMMENT = 'Trimedx master catalog indexed for semantic MMD matching. One row per catalog device.'
 AS
 SELECT
   c.CATALOG_ID,
@@ -289,7 +289,7 @@ FROM STG_MAP_SITE_TO_CATALOG sm
 JOIN TRIMEDX_MMD.MASTER.DEVICE_CATALOG c ON c.CATALOG_ID = sm.CATALOG_ID
 WHERE c.FDA_DI IS NOT NULL;
 
--- Canonical device (anchored on TriMedx CATALOG_ID, enriched with FDA + site presence)
+-- Canonical device (anchored on Trimedx CATALOG_ID, enriched with FDA + site presence)
 CREATE OR REPLACE VIEW STG_DEVICE AS
 SELECT
     c.CATALOG_ID                               AS DEVICE_KEY,
@@ -368,7 +368,7 @@ LEFT JOIN STG_MAP_SITE_TO_CATALOG sm ON sm.EQUIP_ID = e.EQUIP_ID;
 -- KG_NODE LOADS  (one canonical node per resolved entity)
 -- ============================================================================
 
--- Device (canonical, anchored on TriMedx CATALOG_ID)
+-- Device (canonical, anchored on Trimedx CATALOG_ID)
 INSERT INTO KG_NODE (NODE_ID, NODE_TYPE, NAME, PROPS)
 SELECT 'DEV:'||DEVICE_KEY, 'Device', DEVICE_NAME,
   OBJECT_CONSTRUCT(
@@ -767,7 +767,7 @@ INSERT INTO ONT_CLASS VALUES
 ('Organization','Entity',TRUE,'Business entity','core'),
 ('Place','Entity',TRUE,'Physical location','core'),
 ('Record','Entity',TRUE,'Administrative or regulatory record','core'),
-('Device','PhysicalThing',FALSE,'Canonical medical device from TriMedx MMD catalog. Resolves naming variants across FDA, TriMedx, and site inventories into one identity.','device'),
+('Device','PhysicalThing',FALSE,'Canonical medical device from Trimedx MMD catalog. Resolves naming variants across FDA, Trimedx, and site inventories into one identity.','device'),
 ('SiteEquipment','PhysicalThing',FALSE,'A physical device instance at a specific site. Raw inventory record before or after resolution to a canonical Device.','device'),
 ('Manufacturer','Organization',FALSE,'Device manufacturer. Resolves aliases (GE / GE Healthcare / General Electric) into one canonical name.','device'),
 ('DeviceFamily','Entity',FALSE,'Logical grouping of similar devices for pricing, PM scheduling, and fleet analysis.','operations'),
@@ -807,10 +807,10 @@ CREATE OR REPLACE TABLE ONT_OBJECT_SOURCE (
 INSERT INTO ONT_OBJECT_SOURCE VALUES
 ('Device','TRIMEDX_MMD','DEVICE_CATALOG','CATALOG_ID, MODEL_NUMBER, DEVICE_NAME, DEVICE_DESC, FDA_DI, FAMILY_ID','Canonical anchor; one row per known device model'),
 ('Device','FDA_DEVICES','DEVICE_RECORD','GUDID_DI, COMPANY_NAME, BRAND_NAME, VERSION_MODEL_NUMBER, DEVICE_DESCRIPTION','Enrichment via FDA_DI join; provides regulatory description and classification'),
-('Manufacturer','TRIMEDX_MMD','MANUFACTURER','MFR_ID, MFR_NAME, MFR_FULL_NAME','TriMedx internal short names (GE, Phil, Siemens)'),
+('Manufacturer','TRIMEDX_MMD','MANUFACTURER','MFR_ID, MFR_NAME, MFR_FULL_NAME','Trimedx internal short names (GE, Phil, Siemens)'),
 ('Manufacturer','FDA_DEVICES','DEVICE_RECORD','COMPANY_NAME','FDA free-text names (GE Healthcare, General Electric Co, GE Medical Systems)'),
 ('Manufacturer','SITE_INVENTORY','EQUIPMENT_LIST','MANUFACTURER','Site free-text names (GE, G.E., Gen Electric, GE Med Sys, Phil, Drager)'),
-('DeviceFamily','TRIMEDX_MMD','DEVICE_FAMILY','FAMILY_ID, FAMILY_NAME, FAMILY_CATEGORY','TriMedx-only concept; not in FDA or site data'),
+('DeviceFamily','TRIMEDX_MMD','DEVICE_FAMILY','FAMILY_ID, FAMILY_NAME, FAMILY_CATEGORY','Trimedx-only concept; not in FDA or site data'),
 ('SiteEquipment','SITE_INVENTORY','EQUIPMENT_LIST','EQUIP_ID, MANUFACTURER, MODEL, DEVICE_DESCRIPTION, SERIAL_NUMBER','Raw incoming inventory; unstructured free-text fields'),
 ('Site','SITE_INVENTORY','SITE_INFO','SITE_ID, SITE_NAME, SITE_TYPE, BED_COUNT','One record per facility being onboarded'),
 ('Department','SITE_INVENTORY','DEPARTMENT','DEPT_ID, DEPT_NAME, FLOOR, WING','Departments within the site'),
@@ -827,11 +827,11 @@ CREATE OR REPLACE TABLE ONT_IDENTITY_RULE (
 );
 
 INSERT INTO ONT_IDENTITY_RULE VALUES
-('Device',1,'FDA_DI','FDA Global Unique Device Identifier - direct match between TriMedx catalog and FDA registry','HIGH'),
+('Device',1,'FDA_DI','FDA Global Unique Device Identifier - direct match between Trimedx catalog and FDA registry','HIGH'),
 ('Device',2,'MFR+MODEL_EXACT','Normalized manufacturer name + exact normalized model number','HIGH'),
 ('Device',3,'MFR+MODEL_FUZZY','Normalized manufacturer + model substring/containment match','MEDIUM'),
-('Device',4,'SEARCH_MATCH','Cortex Search semantic match over the TriMedx catalog; auto-accepted only when cosine >= 0.55 and >= 0.05 ahead of the runner-up, otherwise sent to review with a suggestion','MEDIUM'),
-('Manufacturer',1,'MFR_ID','TriMedx internal manufacturer ID','HIGH'),
+('Device',4,'SEARCH_MATCH','Cortex Search semantic match over the Trimedx catalog; auto-accepted only when cosine >= 0.55 and >= 0.05 ahead of the runner-up, otherwise sent to review with a suggestion','MEDIUM'),
+('Manufacturer',1,'MFR_ID','Trimedx internal manufacturer ID','HIGH'),
 ('Manufacturer',2,'NORMALIZED_NAME','FN_NORMALIZE_MFR() resolves all known aliases to one canonical name','HIGH'),
 ('SiteEquipment',1,'EQUIP_ID','Site-assigned equipment identifier - unique within a site inventory','HIGH');
 
@@ -847,7 +847,7 @@ INSERT INTO ONT_CLASS_MAP VALUES
 ('FDA_DEVICES','DEVICE_RECORD','Device Record','FDARecord','One-to-one: each GUDID entry maps to one FDARecord node'),
 ('FDA_DEVICES','DEVICE_RECORD','COMPANY_NAME','Manufacturer','Many-to-one: multiple FDA name variants resolve to one Manufacturer'),
 ('TRIMEDX_MMD','DEVICE_CATALOG','Device Catalog Entry','Device','One-to-one: each catalog entry is one canonical Device'),
-('TRIMEDX_MMD','MANUFACTURER','Manufacturer','Manufacturer','One-to-one: TriMedx manufacturer record'),
+('TRIMEDX_MMD','MANUFACTURER','Manufacturer','Manufacturer','One-to-one: Trimedx manufacturer record'),
 ('TRIMEDX_MMD','DEVICE_FAMILY','Device Family','DeviceFamily','One-to-one: logical grouping for service planning'),
 ('TRIMEDX_MMD','PM_SCHEDULE','PM Template','MaintenanceSchedule','One-to-one: each PM template row'),
 ('TRIMEDX_MMD','SERVICE_COST_ESTIMATE','Cost Estimate','ServiceCost','One-to-one: annual cost per device'),

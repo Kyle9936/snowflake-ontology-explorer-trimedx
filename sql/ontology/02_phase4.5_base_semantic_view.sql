@@ -11,10 +11,10 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_BASE
       COMMENT = 'FDA GUDID device registry. COMPANY_NAME is free-text and inconsistent across records for the same manufacturer.',
     trimedx_catalog AS TRIMEDX_MMD.MASTER.DEVICE_CATALOG
       PRIMARY KEY (CATALOG_ID)
-      COMMENT = 'TriMedx master device catalog (Make, Model, Description).',
+      COMMENT = 'Trimedx master device catalog (Make, Model, Description).',
     trimedx_mfr AS TRIMEDX_MMD.MASTER.MANUFACTURER
       PRIMARY KEY (MFR_ID)
-      COMMENT = 'TriMedx manufacturer master. MFR_NAME uses internal abbreviations.',
+      COMMENT = 'Trimedx manufacturer master. MFR_NAME uses internal abbreviations.',
     trimedx_family AS TRIMEDX_MMD.MASTER.DEVICE_FAMILY
       PRIMARY KEY (FAMILY_ID)
       COMMENT = 'Device family groupings for service planning and pricing.',
@@ -65,14 +65,14 @@ CREATE OR REPLACE SEMANTIC VIEW FDA_DEVICES.ONTOLOGY.MMD_ONTOLOGY_BASE
     fda_devices.product_code AS product_code COMMENT = '3-letter FDA product code',
     fda_devices.device_status AS device_status COMMENT = 'In Commercial Distribution or Not in Commercial Distribution',
 
-    trimedx_catalog.catalog_id AS catalog_id COMMENT = 'TriMedx internal catalog identifier',
-    trimedx_catalog.model_number AS model_number WITH SYNONYMS = ('model', 'model number') COMMENT = 'TriMedx internal model designation',
+    trimedx_catalog.catalog_id AS catalog_id COMMENT = 'Trimedx internal catalog identifier',
+    trimedx_catalog.model_number AS model_number WITH SYNONYMS = ('model', 'model number') COMMENT = 'Trimedx internal model designation',
     trimedx_catalog.device_name AS device_name WITH SYNONYMS = ('device', 'device name', 'equipment name') COMMENT = 'Short commercial device name',
     trimedx_catalog.device_desc AS device_desc COMMENT = 'Abbreviated device description',
     trimedx_catalog.status AS status WITH SYNONYMS = ('catalog status') COMMENT = 'ACTIVE, DISCONTINUED, or LEGACY',
 
-    trimedx_mfr.mfr_id AS mfr_id COMMENT = 'TriMedx manufacturer ID',
-    trimedx_mfr.mfr_name AS mfr_name WITH SYNONYMS = ('manufacturer', 'make', 'maker', 'vendor', 'oem') COMMENT = 'TriMedx abbreviated manufacturer name',
+    trimedx_mfr.mfr_id AS mfr_id COMMENT = 'Trimedx manufacturer ID',
+    trimedx_mfr.mfr_name AS mfr_name WITH SYNONYMS = ('manufacturer', 'make', 'maker', 'vendor', 'oem') COMMENT = 'Trimedx abbreviated manufacturer name',
     trimedx_mfr.mfr_full_name AS mfr_full_name COMMENT = 'Longer manufacturer name',
 
     trimedx_family.family_id AS family_id COMMENT = 'Device family ID',

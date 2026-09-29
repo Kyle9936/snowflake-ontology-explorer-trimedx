@@ -5,7 +5,7 @@
 
    This system's vocabulary:
      - A device is an "EQUIPMENT_LIST" entry (free-text, unstructured)
-     - Locations are "DEPARTMENT" names (inconsistent with TriMedx conventions)
+     - Locations are "DEPARTMENT" names (inconsistent with Trimedx conventions)
      - There is NO manufacturer master - just free-text fields
      - There is NO model master - just free-text fields
      - Service history is embedded in the same row (overloaded)
@@ -24,7 +24,7 @@
         - misspelled manufacturer names
         - model numbers with extra/missing characters
         - descriptions that use colloquial terms ("vent" not "ventilator")
-     7. NO FDA identifiers, NO TriMedx catalog IDs - this is raw site data.
+     7. NO FDA identifiers, NO Trimedx catalog IDs - this is raw site data.
 
    Cross-system linkage keys:
      - MANUFACTURER      -> fuzzy match to FDA COMPANY_NAME and TRIMEDX MFR_NAME
@@ -56,12 +56,12 @@ INSERT INTO SITE_INFO VALUES
 (1,'Memorial Regional Medical Center','HOSPITAL',450,'1200 Healthcare Blvd','Indianapolis','IN','46202','2024-07-01');
 
 -- -----------------------------------------------------------------------------
--- DEPARTMENT  (departments at the new site - naming doesn't match TriMedx conventions)
+-- DEPARTMENT  (departments at the new site - naming doesn't match Trimedx conventions)
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE TABLE DEPARTMENT (
     DEPT_ID         NUMBER,
     SITE_ID         NUMBER,
-    DEPT_NAME       STRING,       -- site's own naming (inconsistent with TriMedx)
+    DEPT_NAME       STRING,       -- site's own naming (inconsistent with Trimedx)
     FLOOR           STRING,
     WING            STRING
 );
@@ -86,7 +86,7 @@ INSERT INTO DEPARTMENT VALUES
 
 -- -----------------------------------------------------------------------------
 -- EQUIPMENT_LIST  (the messy raw inventory export from the site's CMMS)
--- This is what TriMedx receives and must match to their MMD catalog.
+-- This is what Trimedx receives and must match to their MMD catalog.
 -- OVERLOADED: device + location + service history in one row.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE TABLE EQUIPMENT_LIST (
@@ -106,7 +106,7 @@ CREATE OR REPLACE TABLE EQUIPMENT_LIST (
 
 INSERT INTO EQUIPMENT_LIST VALUES
 -- ===== ICU (dept 101) - ~15 devices =====
--- Easy matches (manufacturer/model close to TriMedx catalog)
+-- Easy matches (manufacturer/model close to Trimedx catalog)
 (1,1,101,'GE Healthcare','B650','Patient Monitor','SN-GE-B650-001','MR-10001','2021-03-15','2024-01-20','GOOD','IN_SERVICE'),
 (2,1,101,'GE Healthcare','B650','Patient Monitor','SN-GE-B650-002','MR-10002','2021-03-15','2024-01-20','GOOD','IN_SERVICE'),
 (3,1,101,'GE','B850','Bedside Monitor - Critical Care','SN-GE-B850-001','MR-10003','2022-06-10','2024-02-15','GOOD','IN_SERVICE'),

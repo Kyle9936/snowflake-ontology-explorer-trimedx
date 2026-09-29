@@ -94,7 +94,7 @@ export default function KnowledgeGraphView() {
 
   return (
     <div className="canvas-wrap" ref={wrapRef}>
-      <div className="canvas-hint">Real records, resolved across FDA + TriMedx + Site Inventory - shared manufacturers &amp; families connect devices</div>
+      <div className="canvas-hint">Real records, resolved across FDA + Trimedx + Site Inventory - shared manufacturers &amp; families connect devices</div>
 
       {/* device-count presets */}
       <div className="kg-count">

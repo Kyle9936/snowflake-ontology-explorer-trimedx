@@ -49,7 +49,7 @@ export default function Header() {
       </div>
       <div>
         <div className="brand-title">Ontology Explorer</div>
-        <div className="brand-sub">FDA + TriMedx + Site Inventory · MMD matching</div>
+        <div className="brand-sub">FDA + Trimedx + Site Inventory · MMD matching</div>
       </div>
       <div className="header-spacer" />
       <ConnectionBadge />
