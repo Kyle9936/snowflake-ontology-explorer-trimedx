@@ -3,6 +3,10 @@
 Deploy an **Ontology-on-Snowflake knowledge graph** for medical device fleet management into your own account, then **visualize and explore it** in a local web app. The repo ships everything end to end: synthetic (deliberately messy) device data across three source systems, the SQL that builds a full ontology layer on top of it, and a React + Express app that renders the ontology as a graph and lets you chat with a Cortex Agent over it.
 
 > **Forked from [sfc-gh-ccaudill/snowflake-ontology-explorer](https://github.com/sfc-gh-ccaudill/snowflake-ontology-explorer)** and re-skinned for the TriMedx MMD (Make, Model, Description) use case. The original healthcare demo's architecture, framework, and patterns are preserved - only the domain data, ontology classes, and UI copy have been replaced.
+>
+> 
+> <img width="1676" height="1026" alt="Screenshot 2026-09-29 at 11 07 39 AM" src="https://github.com/user-attachments/assets/41817c81-c654-486c-a136-0f0a05e6552d" />
+
 
 ## What this is / when to use it
 
